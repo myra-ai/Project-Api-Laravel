@@ -26,9 +26,9 @@ return new class extends Migration
             $table->foreign('thumbnail_id')->references('id')->on('livestream_medias')->onDelete('cascade');
             $table->string('live_id', 96)->index();
             $table->string('stream_key', 64)->index();
-            $table->string('latency_mode')->default('low');
+            $table->string('latency_mode', 8)->default('ultralow');
             $table->boolean('audio_only')->default(false);
-            $table->string('orientation')->default('landscape')->index();
+            $table->string('orientation', 9)->default('landscape')->index();
             $table->string('status', 16)->default('idle')->index();
             $table->bigInteger('duration')->default(0);
             $table->bigInteger('viewers')->unsigned()->default(0)->index();

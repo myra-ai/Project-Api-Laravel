@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\API;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -26,13 +27,13 @@ class Stories extends Authenticatable
         'title',
         'publish',
         'status',
-        'total_comments',
-        'total_dislikes',
-        'total_likes',
-        'total_shares',
-        'total_views',
-        'total_clicks',
-        'total_opens',
+        'comments',
+        'dislikes',
+        'likes',
+        'shares',
+        'views',
+        'clicks',
+        'opens',
         'deleted_at',
     ];
 
@@ -48,13 +49,13 @@ class Stories extends Authenticatable
         'title' => 'string',
         'publish' => 'boolean',
         'status' => 'string',
-        'total_comments' => 'integer',
-        'total_dislikes' => 'integer',
-        'total_likes' => 'integer',
-        'total_shares' => 'integer',
-        'total_views' => 'integer',
-        'total_clicks' => 'integer',
-        'total_opens' => 'integer',
+        'comments' => 'integer',
+        'dislikes' => 'integer',
+        'likes' => 'integer',
+        'shares' => 'integer',
+        'views' => 'integer',
+        'clicks' => 'integer',
+        'opens' => 'integer',
         'deleted_at' => 'timestamp',
     ];
 
@@ -65,6 +66,6 @@ class Stories extends Authenticatable
 
     public function getThumbnail()
     {
-        return $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')->where('is_thumbnail', true)->first();
+        return $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)->first();
     }
 }

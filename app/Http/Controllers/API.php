@@ -411,11 +411,11 @@ class API extends Controller
     {
         try {
             $svc_stream = match (strtolower(env('STREAM_SERVICE'))) {
-                'mux' => Cache::remember('mux_stream_' . $stream->live_id, now()->addSeconds(7), function () use ($stream) {
+                'mux' => Cache::remember('mux_stream_' . $stream->live_id, now()->addSeconds(5), function () use ($stream) {
                     $svc = MuxStream::getStream($stream->live_id);
                     return $svc;
                 }),
-                'antmedia' => Cache::remember('antmedia_stream_' . $stream->live_id, now()->addSeconds(7), function () use ($stream) {
+                'antmedia' => Cache::remember('antmedia_stream_' . $stream->live_id, now()->addSeconds(5), function () use ($stream) {
                     $svc = AntMediaStream::getStream($stream->live_id, $stream->latency_mode);
                     // Normalize status
                     $svc->status = match ($svc->status) {
@@ -425,7 +425,7 @@ class API extends Controller
                         default => $svc->status,
                     };
                     // Count all types of viewers
-                    $svc->count_viewers = $svc->webRTCViewerCount + $svc->rtmpViewerCount + $svc->hlsViewerCount + $svc->dashViewerCount;
+                    $svc->viewers = $svc->webRTCViewerCount + $svc->rtmpViewerCount + $svc->hlsViewerCount + $svc->dashViewerCount;
                     return $svc;
                 }),
                 default => null,
@@ -456,7 +456,7 @@ class API extends Controller
 
         try {
             $stream->status = $svc_stream->status;
-            $stream->count_viewers = $svc_stream->count_viewers;
+            $stream->viewers = $svc_stream->viewers;
             $stream->save();
         } catch (\Exception $e) {
             $message = (object) [

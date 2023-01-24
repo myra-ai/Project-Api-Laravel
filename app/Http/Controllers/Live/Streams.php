@@ -402,12 +402,9 @@ class Streams extends API
 
         $r->data = (object) [
             'status' => $stream->status,
-            'title' => $stream->title,
             'viewers' => $stream->viewers,
             'likes' => $stream->likes,
-            'dislikes' => $stream->dislikes,
             'comments' => $stream->comments,
-            'latency_mode' => $stream->latency_mode,
             'orientation' => $stream->orientation,
             'last_updated' => $stream->updated_at->timestamp,
             'source' => $stream->source,
@@ -434,7 +431,7 @@ class Streams extends API
         }
 
         $r->data = (object) [
-            'views' => $stream->count_viewers,
+            'viewers' => $stream->viewers,
         ];
 
         $r->success = true;
