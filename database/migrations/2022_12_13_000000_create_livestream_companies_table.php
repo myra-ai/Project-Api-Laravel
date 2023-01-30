@@ -17,6 +17,10 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
             $table->foreign('tenant_id')->references('id')->on('tenant')->onDelete('cascade');
+            $table->uuid('company_id')->index();
+            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->json('permissions')->nullable()->default(null);
+            $table->integer('role')->default(0);
             $table->string('name', 100);
             $table->string('email', 80)->nullable()->default(null);
             $table->string('password', 255)->nullable()->default(null);

@@ -47,4 +47,58 @@ class Handler extends ExceptionHandler
             //
         });
     }
+
+    public function render($request, Throwable $e)
+    {
+        if ($this->isHttpException($e)) {
+            if ($e->getStatusCode() == 404) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => (object) [
+                        'type' => 'error',
+                        'message' => __('Not Found'),
+                    ],
+                    'data' => null,
+                ], 404);
+            } else if ($e->getStatusCode() == 403) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => (object) [
+                        'type' => 'error',
+                        'message' => __('Forbidden'),
+                    ],
+                    'data' => null,
+                ], 403);
+            } else if ($e->getStatusCode() == 419) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => (object) [
+                        'type' => 'error',
+                        'message' => __('Page Expired'),
+                    ],
+                    'data' => null,
+                ], 503);
+            } else if ($e->getStatusCode() == 429) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => (object) [
+                        'type' => 'error',
+                        'message' => __('Too Many Requests'),
+                    ],
+                    'data' => null,
+                ], 503);
+            } else if ($e->getStatusCode() == 500) {
+                return response()->json([
+                    'success' => false,
+                    'messages' => (object) [
+                        'type' => 'error',
+                        'message' => __('Internal Server Error'),
+                    ],
+                    'data' => null,
+                ], 500);
+            }
+        }
+
+        return parent::render($request, $e);
+    }
 }

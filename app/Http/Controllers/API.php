@@ -1077,7 +1077,7 @@ class API extends Controller
         return $media;
     }
 
-    public static function getCompanyAccountByEmail(?object &$r = null, string $email, bool $skip_check_account = false): object
+    public static function getCompanyAccountByEmail(string $email, bool $skip_check_account = false, ?object &$r = null): object | null
     {
         $r = $r ?? self::INIT();
 
@@ -1119,7 +1119,7 @@ class API extends Controller
         return $account;
     }
 
-    public static function getCompanyAccountByToken(?object &$r = null, string $token): object
+    public static function getCompanyAccountByToken(string $token, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -1141,20 +1141,11 @@ class API extends Controller
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        if ($account === null) {
+        if ($account === null || $account->deleted_at !== null) {
             $r->messages[] = (object) [
                 'type' => 'error',
-                'message' => __('Account could not be found.'),
+                'message' => __('Token is invalid.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
-        }
-
-        if ($account->deleted_at !== null) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Account is deleted.'),
-            ];
-            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 

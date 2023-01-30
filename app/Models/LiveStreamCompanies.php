@@ -68,4 +68,24 @@ class LiveStreamCompanies extends Authenticatable
         $this->save();
         return $this->token;
     }
+
+    public function getCompanyUsers()
+    {
+        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->get();
+    }
+
+    public function getCompanyUser(string $id)
+    {
+        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->where('id', $id)->first();
+    }
+
+    public function getCompanyUserByEmail(string $email)
+    {
+        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->where('email', $email)->first();
+    }
+
+    public function getCompanyUserByToken(string $token)
+    {
+        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->where('token', $token)->first();
+    }
 }

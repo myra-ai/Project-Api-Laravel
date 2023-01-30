@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Console\Commands\Live\StreamStatusCheck;
 use App\Console\Commands\Live\SyncWithS3;
+use App\Console\Commands\Metrics\DeployLogs;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Spatie\ShortSchedule\ShortSchedule;
@@ -18,7 +19,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command(SyncWithS3::class)->everyMinutes(15);
+        $schedule->command(SyncWithS3::class)->everyFiveMinutes();
+        $schedule->command(DeployLogs::class)->everyTenMinutes();
     }
 
     protected function shortSchedule(ShortSchedule $shortSchedule)

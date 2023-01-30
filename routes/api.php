@@ -88,6 +88,14 @@ Route::get('/media/raw/{path}', [L\Medias::class, 'getMediaRawByPath'])->where('
 Route::get('/widget/{company_id}/stream', [L\Widget::class, 'getWidgetStream']);
 Route::get('/widget/{company_id}/story', [L\Widget::class, 'getWidgetStory']);
 
+Route::post('/account/login', [C\Account::class, 'doCompanyLogin']);
+Route::post('/account/validate/token', [C\Account::class, 'doCompanyValidateToken']);
+Route::post('/account/logout', [C\Account::class, 'doCompanyLogout']);
+Route::post('/account/password/reset', [C\Account::class, 'doCompanyResetPassword']);
+Route::post('/account/password/reset/{token}', [C\Account::class, 'doCompanyResetPasswordVerify']);
+Route::post('/account/password/change', [C\Account::class, 'doCompanyChangePassword']);
+Route::get('/account/users', [C\Account::class, 'getCompanyUsers']);
+
 Route::get('/company/{company_id}', [L\Company::class, 'getCompanyByID']);
 Route::put('/company/{company_id}', [L\Company::class, 'doUpdateCompany']);
 Route::get('/company/{company_id}/settings', [L\Company::class, 'getCompanySettings']);
@@ -96,11 +104,12 @@ Route::delete('/company/{company_id}', [L\Company::class, 'doDeleteCompany']);
 
 Route::get('/l/{link_id}', [C\Links::class, 'getLink']);
 
-Route::post('/account/login', [C\Account::class, 'doLogin']);
-Route::post('/account/logout', [C\Account::class, 'doLogout']);
-Route::post('/account/password/reset', [C\Account::class, 'doResetPassword']);
-Route::post('/account/password/reset/{token}', [C\Account::class, 'doResetPasswordVerify']);
-Route::post('/account/password/change', [C\Account::class, 'doChangePassword']);
+Route::get('/metrics/accessed/most/ip', [L\Metrics::class, 'getMostAccessedIp']);
+Route::get('/metrics/accessed/most/city', [L\Metrics::class, 'getMostAccessedCountry']);
+Route::get('/metrics/accessed/most/country', [L\Metrics::class, 'getMostAccessedCountry']);
+Route::get('/metrics/accessed/most/referer', [L\Metrics::class, 'getMostAccessedReferer']);
+Route::get('/metrics/acceses/total/days', [L\Metrics::class, 'getTotalAccessByDays']);
+Route::get('/metrics/acceses/average/days', [L\Metrics::class, 'getAverageAccessByDays']);
 
 Route::get('/healthcheck', function () {
     return response()->json(['status' => 'ok'], Response::HTTP_OK);

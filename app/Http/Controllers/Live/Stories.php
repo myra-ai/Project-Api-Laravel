@@ -173,7 +173,7 @@ class Stories extends API
             'only_published' => ['nullable', new strBoolean],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'order_by' => ['nullable', 'string', 'in:count_viewers,total_views,total_comments,total_clicks,total_opens,status,publish,created_at'],
+            'order_by' => ['nullable', 'string', 'in:viewers,views,comments,clicks,opens,status,publish,created_at'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
@@ -237,9 +237,8 @@ class Stories extends API
                             'thumbnail' => $thumbnail,
                             'status' => $story->status,
                             'publish' => $story->publish,
-                            'count_viewers' => $story->count_viewers,
-                            'total_views' => $story->total_views,
-                            'total_comments' => $story->total_comments,
+                            'views' => $story->views,
+                            'comments' => $story->comments,
                             'created_at' => $story->created_at,
                         ];
                     });
@@ -313,13 +312,13 @@ class Stories extends API
             'thumbnail' => $thumbnail,
             'status' => $story->status,
             'publish' => $story->publish,
-            'count_viewers' => $story->count_viewers,
-            'total_clicks' => $story->total_clicks,
-            'total_comments' => $story->total_comments,
-            'total_dislikes' => $story->total_dislikes,
-            'total_likes' => $story->total_likes,
-            'total_opens' => $story->total_opens,
-            'total_views' => $story->total_views,
+            'viewers' => $story->viewers,
+            'clicks' => $story->clicks,
+            'comments' => $story->comments,
+            'dislikes' => $story->dislikes,
+            'likes' => $story->likes,
+            'opens' => $story->opens,
+            'views' => $story->views,
             'created_at' => $story->created_at,
         ];
         $r->success = true;

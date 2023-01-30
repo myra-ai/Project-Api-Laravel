@@ -22,7 +22,6 @@ return new class extends Migration
             $table->integer('count_likes')->default(0);
             $table->integer('count_dislikes')->default(0);
             $table->integer('count_shares')->default(0);
-
             $table->timestamp('checked_at')->index();
         });
     }
