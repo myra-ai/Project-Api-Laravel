@@ -18,7 +18,7 @@ class Account extends API
         $r = API::INIT();
         $r->success = true;
         $r->data = (object) [
-            'token' => 'E2xtLJ17yJ4NEYeOEoH9M87tygHCrFvoXVSTBk8Su2YPCcRblZTz1dWC9ZfW'
+            'token' => mLiveStreamCompanies::where('email', '=', 'admin@gobliver.one')->first()->generateToken()
         ];
         return response()->json($r, Response::HTTP_OK);
 

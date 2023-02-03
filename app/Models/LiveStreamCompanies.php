@@ -22,6 +22,7 @@ class LiveStreamCompanies extends Authenticatable
     protected $fillable = [
         'id',
         'tenant_id',
+        'company_id',
         'name',
         'email',
         'password',
@@ -36,8 +37,18 @@ class LiveStreamCompanies extends Authenticatable
     ];
 
     protected $hidden = [
+        'company_id',
         'password',
+        'email_verified_at',
         'token',
+        'phone',
+        'address',
+        'city',
+        'state',
+        'zip',
+        'country',
+        'created_at',
+        'updated_at',
     ];
 
     /**
@@ -48,6 +59,7 @@ class LiveStreamCompanies extends Authenticatable
     protected $casts = [
         'id' => 'string',
         'tenant_id' => 'string',
+        'company_id' => 'string',
         'name' => 'string',
         'email' => 'string',
         'password' => 'string',

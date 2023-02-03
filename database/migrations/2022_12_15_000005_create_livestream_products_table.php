@@ -24,7 +24,7 @@ return new class extends Migration
             $table->longText('description')->nullable()->default(null);
             $table->float('price', 8, 2, true)->default(0);
             $table->string('currency', 3)->default('BRL');
-            $table->boolean('is_active')->default(true);
+            $table->integer('status')->default(1);
             $table->uuid('link_id')->nullable()->default(null)->index();
             $table->foreign('link_id')->references('id')->on('links')->onDelete('cascade');
             $table->boolean('promoted')->default(false);

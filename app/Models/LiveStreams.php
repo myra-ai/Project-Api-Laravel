@@ -15,6 +15,7 @@ class LiveStreams extends Authenticatable
     protected $table = 'livestreams';
     protected $primaryKey = 'id';
     public $timestamps = true;
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     /**
      * The attributes that are mass assignable.
@@ -48,16 +49,20 @@ class LiveStreams extends Authenticatable
 
     protected $hidden = [
         'company_id',
+        'thumbnail_id',
         'live_id',
         'stream_key',
         'duration',
         'dislikes',
+        'latency_mode',
         'shares',
         'viewers',
         'widget_views',
         'widget_clicks',
         'deleted_at',
         'note',
+        'sheduled_at',
+        'max_duration',
         'created_at',
         'updated_at',
     ];
@@ -112,6 +117,36 @@ class LiveStreams extends Authenticatable
 
     public function getThumbnail()
     {
-        return $this->hasOne(LiveStreamMedias::class, 'id', 'thumbnail_id')->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)->first();
+        $media = $this->hasOne(LiveStreamMedias::class, 'id', 'thumbnail_id')->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)->first();
+
+        if ($media == null) {
+            return null;
+        }
+
+        return match ($media->s3_available) {
+            null => API::getMediaUrl($media->id),
+            default => API::getMediaCdnUrl($media->path)
+        };
+    }
+
+    public function getThumbnailDetails()
+    {
+        $media = $this->hasOne(LiveStreamMedias::class, 'id', 'thumbnail_id')->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)->first();
+
+        if ($media == null) {
+            return null;
+        }
+
+        return (object) [
+            'id' => $media->id,
+            'url' => match ($media->s3_available) {
+                null => API::getMediaUrl($media->id),
+                default => API::getMediaCdnUrl($media->path)
+            },
+            'alt' => $media->alt,
+            'mime' => $media->mime,
+            'width' => $media->width,
+            'height' => $media->height,
+        ];
     }
 }

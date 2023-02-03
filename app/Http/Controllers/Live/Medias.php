@@ -16,6 +16,8 @@ class Medias extends API
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
             'file' => ['required', 'file', 'mimes:jpeg,jpg,png,gif,mp4,mov,avi,webm,webp,heic,heif'],
+            'alt' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.@#\$ ,;]+$/u', 'max:110'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'is_thumbnail' => ['nullable', new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
@@ -25,7 +27,19 @@ class Medias extends API
             return $company;
         }
 
-        if (($media = API::registerMediaFromFile($params['file'], $params['is_thumbnail'], $r)) instanceof JsonResponse) {
+        if (!isset($params['is_thumbnail'])) {
+            $params['is_thumbnail'] = false;
+        }
+
+        if (!isset($params['alt'])) {
+            $params['alt'] = '';
+        }
+
+        if (!isset($params['description'])) {
+            $params['description'] = '';
+        }
+
+        if (($media = API::registerMediaFromFile($params['file'], $params['is_thumbnail'], $params['alt'], $params['description'], $r)) instanceof JsonResponse) {
             return $media;
         }
 
@@ -39,6 +53,8 @@ class Medias extends API
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
             'url' => ['required', 'string', 'url'],
+            'alt' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9_\-\.@#\$ ,;]+$/u', 'max:110'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'is_thumbnail' => ['nullable', new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
@@ -48,7 +64,19 @@ class Medias extends API
             return $company;
         }
 
-        if (($media = API::registerMediaFromUrl($params['url'], $params['is_thumbnail'], $r)) instanceof JsonResponse) {
+        if (!isset($params['is_thumbnail'])) {
+            $params['is_thumbnail'] = false;
+        }
+
+        if (!isset($params['alt'])) {
+            $params['alt'] = '';
+        }
+
+        if (!isset($params['description'])) {
+            $params['description'] = '';
+        }
+
+        if (($media = API::registerMediaFromUrl($params['url'], $params['is_thumbnail'], $params['alt'], $params['description'], $r)) instanceof JsonResponse) {
             return $media;
         }
 
@@ -118,7 +146,7 @@ class Medias extends API
             return $media;
         }
 
-        if (($cdn = API::doSyncMediaWithCDN($media,$r)) instanceof JsonResponse) {
+        if (($cdn = API::doSyncMediaWithCDN($media, $r)) instanceof JsonResponse) {
             return $cdn;
         }
 
@@ -165,7 +193,7 @@ class Medias extends API
             return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
-        if (($cdn = API::doSyncMediaWithCDN($thumbnail,$r)) instanceof JsonResponse) {
+        if (($cdn = API::doSyncMediaWithCDN($thumbnail, $r)) instanceof JsonResponse) {
             return $cdn;
         }
 

@@ -31,7 +31,6 @@ return new class extends Migration
             $table->integer('width')->nullable()->default(null);
             $table->integer('height')->nullable()->default(null);
             $table->integer('duration')->nullable()->default(null);
-            $table->string('title', 80)->nullable()->default(null);
             $table->longText('description')->nullable()->default(null);
             $table->string('alt', 255)->nullable()->default(null);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);

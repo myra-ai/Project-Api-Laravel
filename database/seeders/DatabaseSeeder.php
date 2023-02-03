@@ -58,8 +58,19 @@ class DatabaseSeeder extends Seeder
             'zip' => '10001',
             'country' => 'USA',
         ]);
-        $avatar = API::registerMediaFromUrl('https://www.nicepng.com/png/detail/347-3474759_icon-square-big-example-handle-with-care-symbol.png');
-        $logo = API::registerMediaFromUrl('https://avatars.slack-edge.com/2022-12-21/4545133762933_59a0cfb8e43a20afa86b_88.png');
+        API::registerMediaFromUrl('https://via.placeholder.com/32.webp', alt: 'Placeholder 32', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/64.webp', alt: 'Placeholder 64', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/128.webp', alt: 'Placeholder 128', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/300.webp', alt: 'Placeholder 300', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/512.webp', alt: 'Placeholder 512', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1024.webp', alt: 'Placeholder 1024', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1200.webp', alt: 'Placeholder 1200', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1400.webp', alt: 'Placeholder 1400', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1600.webp', alt: 'Placeholder 1600', desc: 'Default image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1920x1080.webp', alt: 'Placeholder 1920x1080', desc: 'Landscape image placeholder');
+        API::registerMediaFromUrl('https://via.placeholder.com/1080x1920.webp', alt: 'Placeholder 1080x1920', desc: 'Portrait image placeholder');
+        $avatar = API::registerMediaFromUrl('https://www.nicepng.com/png/detail/347-3474759_icon-square-big-example-handle-with-care-symbol.png', alt: 'Avatar', desc: 'Default avatar');
+        $logo = API::registerMediaFromUrl('https://avatars.slack-edge.com/2022-12-21/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Logo', desc: 'Default logo');
         mLiveStreamSettings::create([
             'id' => Str::uuid()->toString(),
             'company_id' => $company_id,
@@ -75,7 +86,7 @@ class DatabaseSeeder extends Seeder
             'stories_is_embedded' => true,
             'livestream_autoopen' => false,
         ]);
-        $story = API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/video/01d247ad-f847-4b95-84a0-54cf271de966-mixkit-man-under-multicolored-lights-1237-medium.mp4');
+        $story = API::registerMediaFromUrl('https://cdn.eibly.com/video/01d247ad-f847-4b95-84a0-54cf271de966-mixkit-man-under-multicolored-lights-1237-medium.mp4');
         $story_id = '3820b3ac-b55a-4e52-a4fa-97fbbb532c39'; // Str::uuid()->toString();
         $story_id2 = '4b5912d4-2671-4cd2-a736-4f8da90b2ec7'; // Str::uuid()->toString();
         $story_id3 = '51841316-8b7c-402d-961d-cd00c7018338'; // Str::uuid()->toString();
@@ -87,7 +98,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'ACTIVE',
             'media_id' => $story->id,
         ]);
-        $story = API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/video/high.mp4');
+        $story = API::registerMediaFromUrl('https://cdn.eibly.com/video/high.mp4');
         mStories::create([
             'id' => $story_id2,
             'company_id' => $company_id,
@@ -96,7 +107,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'ACTIVE',
             'media_id' => $story->id,
         ]);
-        $story = API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/video/high2.mp4');
+        $story = API::registerMediaFromUrl('https://cdn.eibly.com/video/high2.mp4');
         mStories::create([
             'id' => $story_id3,
             'company_id' => $company_id,
@@ -123,14 +134,14 @@ class DatabaseSeeder extends Seeder
         $link2 = API::registerLink('https://images.pexels.com/photos/3525688/pexels-photo-3525688.jpeg?cs=srgb&fm=jpg&w=1920&h=1080');
         $link3 = API::registerLink('https://images.pexels.com/photos/7078445/pexels-photo-7078445.jpeg?cs=srgb&fm=jpg&w=1920&h=1080');
         $product_image = [
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1670450734728-c4d6f59134f0.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1670612389555-1de63603416a.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1670759699765-96f760531c18.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1671035812235-fc43ebce5ac8.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1671230926745-661ecd5b0d40.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1671419742115-7cd22c6eae73.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1671465184864-1fe3ea6c7734.jpg'),
-            API::registerMediaFromUrl('https://cdn.eibly.com/1a01fac3/images/photo-1671470394194-ab66585bd009.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1670450734728-c4d6f59134f0.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1670612389555-1de63603416a.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1670759699765-96f760531c18.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1671035812235-fc43ebce5ac8.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1671230926745-661ecd5b0d40.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1671419742115-7cd22c6eae73.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1671465184864-1fe3ea6c7734.jpg'),
+            API::registerMediaFromUrl('https://cdn.eibly.com/images/photo-1671470394194-ab66585bd009.jpg'),
         ];
         $product_id = [
             Str::uuid()->toString(),
@@ -140,34 +151,34 @@ class DatabaseSeeder extends Seeder
         mLiveStreamProducts::create([
             'id' => $product_id[0],
             'company_id' => $company_id,
-            'title' => 'My First Product',
+            'title' => __('My First Product'),
             'description' => 'Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry\'s standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.',
-            'price' => 149.90,
+            'price' => rand(100, 3000),
             'link_id' => $link->id,
             'currency' => 'BRL',
-            'is_active' => true,
+            'status' => 1,
             'promoted' => false,
         ]);
         mLiveStreamProducts::create([
             'id' => $product_id[1],
             'company_id' => $company_id,
-            'title' => 'My Second Product',
+            'title' => __('My Second Product'),
             'description' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using \'Content here, content here\', making it look like readable English',
-            'price' => 80,
+            'price' => rand(50, 250).rand(1, 99),
             'link_id' => $link2->id,
             'currency' => 'BRL',
-            'is_active' => true,
+            'status' => 1,
             'promoted' => true,
         ]);
         mLiveStreamProducts::create([
             'id' => $product_id[2],
             'company_id' => $company_id,
-            'title' => 'My Third Product',
+            'title' => __('My Third Product'),
             'description' => 'Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old.',
-            'price' => 19.99,
+            'price' => rand(10, 80),
             'link_id' => $link3->id,
-            'currency' => 'BRL',
-            'is_active' => true,
+            'currency' => 'USD',
+            'status' => 1,
             'promoted' => false,
         ]);
         mLiveStreamProductsImages::create([

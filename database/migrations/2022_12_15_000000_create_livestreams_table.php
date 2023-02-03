@@ -13,14 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
-        $stream_max_title_length = (int) config('app.stream_title_max_length', 100);
-        $stream_max_title_length = $stream_max_title_length * 2 > 255 ? 255 : $stream_max_title_length;
-
-        Schema::create('livestreams', function (Blueprint $table) use ($stream_max_title_length) {
+        Schema::create('livestreams', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->index();
             $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
-            $table->string('title', $stream_max_title_length)->nullable()->default(null);
+            $table->string('title', 255)->nullable()->default(null);
             $table->timestamp('sheduled_at')->nullable()->default(null);
             $table->uuid('thumbnail_id')->nullable()->default(null)->index();
             $table->foreign('thumbnail_id')->references('id')->on('livestream_medias')->onDelete('cascade');

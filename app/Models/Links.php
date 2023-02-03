@@ -40,4 +40,12 @@ class Links extends Authenticatable
         'checksum' => 'string',
         'deleted_at' => 'timestamp',
     ];
+
+    protected $hidden = [
+        'clicks',
+        'checksum',
+        'created_at',
+        'deleted_at',
+        'updated_at',
+    ];
 }

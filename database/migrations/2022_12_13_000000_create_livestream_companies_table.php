@@ -17,8 +17,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
             $table->foreign('tenant_id')->references('id')->on('tenant')->onDelete('cascade');
-            $table->uuid('company_id')->index();
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->uuid('company_id')->index()->nullable()->default(null);
             $table->json('permissions')->nullable()->default(null);
             $table->integer('role')->default(0);
             $table->string('name', 100);
@@ -33,6 +32,10 @@ return new class extends Migration
             $table->string('zip', 80)->nullable()->default(null);
             $table->string('country', 80)->nullable()->default(null);
             $table->timestamps();
+        });
+
+        Schema::table('livestream_companies', function (Blueprint $table) {
+            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
         });
     }
 

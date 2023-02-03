@@ -8,8 +8,12 @@ use App\Models\Links as mLinks;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
+use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
 use App\Models\LiveStreams as mLiveStreams;
 use App\Models\Stories as mStories;
+use FFMpeg\Coordinate\Dimension;
+use FFMpeg\Coordinate\TimeCode;
+use FFMpeg\FFMpeg;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -18,9 +22,6 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManagerStatic as Image;
 use Ramsey\Uuid\Uuid;
-use FFMpeg\FFMpeg;
-use FFMpeg\Coordinate\TimeCode;
-use FFMpeg\Coordinate\Dimension;
 
 class API extends Controller
 {
@@ -345,7 +346,7 @@ class API extends Controller
                 'message' => __('The story could not be found.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'Story not found in database.';
+                $message->debug = __('Story not found in database.');
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -448,7 +449,7 @@ class API extends Controller
                 'message' => __('Stream service not found.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'The stream service (environment variables) could not be found.';
+                $message->debug = __('The stream service (environment variables) could not be found.');
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -537,7 +538,7 @@ class API extends Controller
         return $link;
     }
 
-    public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, ?object &$r = null): object
+    public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -556,7 +557,11 @@ class API extends Controller
         }
 
         try {
-            $type = self::getTypeByMime($mime);
+            if ($is_thumbnail === true) {
+                $type = self::MEDIA_TYPE_IMAGE_THUMBNAIL;
+            } else {
+                $type = self::getTypeByMime($mime);
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'warning',
@@ -578,13 +583,13 @@ class API extends Controller
 
         $checksum = self::getFileChecksum($path);
 
-        if (mLiveStreamMedias::where('checksum', '=', $checksum)->exists()) {
+        if (($media = mLiveStreamMedias::where('checksum', '=', $checksum)->first()) !== null) {
             $message = (object) [
                 'type' => 'warning',
                 'message' => __('Media already exists.'),
             ];
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return $media;
         }
 
         $duration = null;
@@ -702,6 +707,11 @@ class API extends Controller
         }
 
         if ($media !== null) {
+            $message = (object) [
+                'type' => 'warning',
+                'message' => __('Media already exists.'),
+            ];
+            $r->messages[] = $message;
             return $media;
         }
 
@@ -721,27 +731,31 @@ class API extends Controller
             $media->width = $width;
             $media->height = $height;
             $media->duration = $duration;
+            $media->description = $desc;
+            $media->alt = $alt;
             $media->created_at = now()->format('Y-m-d H:i:s.u');
             $media->save();
             $media->id = $id;
 
-            foreach ($thumbnails as $thumbnail) {
-                $thumbnail_media = new mLiveStreamMedias();
-                $thumbnail_media->id = Str::uuid()->toString();
-                $thumbnail_media->parent_id = $id;
-                $thumbnail_media->checksum = $thumbnail->checksum;
-                $thumbnail_media->original_name = $thumbnail->original_name;
-                $thumbnail_media->path = $thumbnail->path;
-                $thumbnail_media->policy = 'public';
-                $thumbnail_media->type =  $thumbnail->type;
-                $thumbnail_media->mime =  $thumbnail->mime;
-                $thumbnail_media->extension =  $thumbnail->extension;
-                $thumbnail_media->size = $thumbnail->size;
-                $thumbnail_media->width = $thumbnail->width;
-                $thumbnail_media->height = $thumbnail->height;
-                $thumbnail_media->duration = null;
-                $thumbnail_media->created_at = now()->format('Y-m-d H:i:s.u');
-                $thumbnail_media->save();
+            if (count($thumbnails) > 0) {
+                foreach ($thumbnails as $thumbnail) {
+                    $thumbnail_media = new mLiveStreamMedias();
+                    $thumbnail_media->id = Str::uuid()->toString();
+                    $thumbnail_media->parent_id = $id;
+                    $thumbnail_media->checksum = $thumbnail->checksum;
+                    $thumbnail_media->original_name = $thumbnail->original_name;
+                    $thumbnail_media->path = $thumbnail->path;
+                    $thumbnail_media->policy = 'public';
+                    $thumbnail_media->type =  $thumbnail->type;
+                    $thumbnail_media->mime =  $thumbnail->mime;
+                    $thumbnail_media->extension =  $thumbnail->extension;
+                    $thumbnail_media->size = $thumbnail->size;
+                    $thumbnail_media->width = $thumbnail->width;
+                    $thumbnail_media->height = $thumbnail->height;
+                    $thumbnail_media->duration = null;
+                    $thumbnail_media->created_at = now()->format('Y-m-d H:i:s.u');
+                    $thumbnail_media->save();
+                }
             }
         } catch (\Exception $e) {
             $message = (object) [
@@ -758,7 +772,7 @@ class API extends Controller
         return $media;
     }
 
-    public static function registerMediaFromFile($file, bool $is_thumbnail = false, ?object &$r = null): object
+    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -805,10 +819,10 @@ class API extends Controller
 
         $path = storage_path('app/public/' . $path);
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $r);
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
     }
 
-    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, ?object &$r = null): object
+    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -895,7 +909,7 @@ class API extends Controller
 
         $path = storage_path('app/public/' . $path_type . $base_checksum . '.' . $extension);
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $r);
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
     }
 
     /**
@@ -939,7 +953,7 @@ class API extends Controller
         if ($product->deleted_at !== null) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Product is deleted.'),
+                'message' => __('The product is excluded.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -947,6 +961,48 @@ class API extends Controller
 
         return $product;
     }
+
+    /**
+     * Get live stream data from local database
+     * 
+     * @param object $r
+     * @param array $params
+     * 
+     * @return object
+     */
+    public static function getImageProduct(?object &$r = null, string $image_id): object
+    {
+        $r = $r ?? self::INIT();
+
+        $image = null;
+
+        try {
+            $image = Cache::remember('product_image_by_id_' . $image_id, now()->addSeconds(self::CACHE_TIME), function () use ($image_id) {
+                return mLiveStreamProductsImages::where('id', '=', $image_id)->first();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get product image data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($image === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Product image could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $image;
+    }
+
 
     public static function getMedia(?object &$r = null, string $media_id): object
     {
@@ -985,7 +1041,7 @@ class API extends Controller
         if ($media->deleted_at !== null) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Media is deleted.'),
+                'message' => __('The media is excluded.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1068,7 +1124,7 @@ class API extends Controller
         if ($media->deleted_at !== null) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Media is deleted.'),
+                'message' => __('The media is excluded.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1110,7 +1166,7 @@ class API extends Controller
         if ($skip_check_account === false && $account->deleted_at !== null) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Account is deleted.'),
+                'message' => __('The account is excluded.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1180,7 +1236,7 @@ class API extends Controller
                 'message' => __('Company could not be found.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'The company could not be found in the database.';
+                $message->debug = __('The company could not be found in the database.');
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1189,7 +1245,7 @@ class API extends Controller
         if ($company->deleted_at !== null) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Company is deleted.'),
+                'message' => __('The company is excluded.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1208,7 +1264,7 @@ class API extends Controller
                 'message' => __('The link ID is missing.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'The link ID is missing.';
+                $message->debug = 'The link ID is missing from the request.';
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1220,7 +1276,7 @@ class API extends Controller
                 'message' => __('The link ID is invalid.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'The link ID is invalid.';
+                $message->debug = __('A link ID can only contain letters, numbers, dashes, underscores and dots.');
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -1234,7 +1290,7 @@ class API extends Controller
                 'message' => __('The link could not be found.'),
             ];
             if (config('app.debug')) {
-                $message->debug = 'The link could not be found in the database.';
+                $message->debug = __('The link could not be found in the database.');
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);

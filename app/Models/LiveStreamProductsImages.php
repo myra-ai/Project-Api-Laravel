@@ -35,4 +35,10 @@ class LiveStreamProductsImages extends Authenticatable
         'product_id' => 'string',
         'media_id' => 'string',
     ];
+
+
+    protected $hidden = [
+        'created_at',
+        'updated_at',
+    ];
 }
