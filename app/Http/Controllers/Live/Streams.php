@@ -284,10 +284,14 @@ class Streams extends API
                 return mLiveStreams::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
-            $r->messages[] = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Stream could not be retrieved.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 

@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use App\Casts\Base64;
+use App\Casts\Timestamp;
+use App\Http\Controllers\API;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use App\Http\Controllers\API;
 
 class LiveStreams extends Authenticatable
 {
@@ -76,7 +77,7 @@ class LiveStreams extends Authenticatable
         'id' => 'string',
         'company_id' => 'string',
         'title' => Base64::class,
-        'sheduled_at' => 'timestamp',
+        'sheduled_at' => Timestamp::class,
         'thumbnail_id' => 'string',
         'live_id' => 'string',
         'stream_key' => 'string',

@@ -35,9 +35,6 @@ class Products extends API
 
         $product_id = Str::uuid()->toString();
 
-        if (isset($params['status'])) {
-            $params['status'] = filter_var($params['status'], FILTER_VALIDATE_BOOLEAN);
-        }
         if (isset($params['promoted'])) {
             $params['promoted'] = filter_var($params['promoted'], FILTER_VALIDATE_BOOLEAN);
         }
@@ -54,21 +51,23 @@ class Products extends API
         try {
             $data = [
                 'id' => $product_id,
+                'company_id' => $params['company_id'],
+                'title' => $params['title'],
+                'status' => $params['status'] ?? false,
+                'currency' => $params['currency'] ?? 'BRL',
+                'description' => $params['description'] ?? null,
+                'price' => $params['price'],
+                'promoted' => $params['promoted'] ?? false,
             ];
-            $data['company_id'] = $params['company_id'];
-            $data['title'] = $params['title'];
-            $data['status'] = $params['status'] ?? false;
-            $data['currency'] = $params['currency'] ?? 'BRL';
-            $data['description'] = $params['description'] ?? null;
-            $data['price'] = $params['price'];
-            $data['promoted'] = $params['promoted'] ?? false;
-            if (isset($params['link']) && !empty($params['link'])) {
+
+            if (isset($params['link'])) {
                 $params['link'] = trim($params['link']);
                 if (($link = API::registerLink($params['link'], $r)) instanceof JsonResponse) {
                     return $link;
                 }
                 $data['link_id'] = $link->id;
             }
+
             $product = mLiveStreamProducts::create($data);
 
             if (isset($params['images_url'])) {
@@ -147,7 +146,13 @@ class Products extends API
             'type' => 'success',
             'message' => __('Product created successfully.'),
         ];
-        $r->data = $product;
+        $r->data = (object) [
+            'id' => $product_id,
+            'created' => now()->toISOString(),
+            'link' => (object)[
+                'id' => $link->id,
+            ],
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
