@@ -329,18 +329,26 @@ class Streams extends API
         }
 
         if ($stream->company_id !== $params['company_id']) {
-            $r->messages[] = [
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Stream could not be deleted.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = 'Stream company_id does not match.';
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         if (!in_array($stream->status, ['created', 'idle', 'ended'])) {
-            $r->messages[] = [
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Stream could not be deleted.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = 'Stream status is not valid.';
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
@@ -356,29 +364,44 @@ class Streams extends API
                     // Need usage latency_mode to usage correctly base url
                     $service = AntMediaStream::doDeleteLive($stream_id, $stream->latency_mode);
                     if ($service->success === false) {
-                        $r->messages[] = [
+                        $message = (object) [
                             'type' => 'error',
                             'message' => $service->message ?? __('Stream could not be deleted.'),
                         ];
+                        if (config('app.debug')) {
+                            $message->debug = $service->message ?? 'Occured an error while deleting stream with AntMedia.';
+                        }
                         return response()->json($r, Response::HTTP_BAD_REQUEST);
                     }
                     $service_message = $service->message;
                     break;
                 default:
-                    $r->messages[] = [
+                    $message = (object) [
                         'type' => 'error',
                         'message' => __('Stream service not found.'),
                     ];
+                    if (config('app.debug')) {
+                        $message->debug = 'No stream service found.';
+                    }
+                    $r->messages[] = $message;
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
             }
         } catch (\Exception $e) {
-            $r->messages[] = [
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Stream could not be deleted.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Stream successfully deleted.'),
+        ];
         $r->data = [
             'stream_id' => $stream_id,
             'service_message' => $service_message,

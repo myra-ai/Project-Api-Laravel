@@ -231,9 +231,10 @@ class API extends Controller
         };
     }
 
-    public static function getFileChecksum(string $file): string
+    public static function getFileChecksum(string $file, bool $is_thumbnail): string
     {
         $sha1 = sha1_file($file);
+        $sha1 = sha1($sha1 . ($is_thumbnail ? '1' : '0'));
         return substr($sha1, 0, 8) . '-' . substr($sha1, 8, 4) . '-' . substr($sha1, 12, 4) . '-' . substr($sha1, 16, 4) . '-' . substr($sha1, 20, 12);
     }
 
@@ -482,7 +483,7 @@ class API extends Controller
         if ($http->failed()) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Failed to get link.'),
+                'message' => __('Failed when trying to access the link to validate it.'),
             ];
             if (config('app.debug')) {
                 $message->debug = $http->body();
@@ -538,6 +539,145 @@ class API extends Controller
         return $link;
     }
 
+    public static function mediaPathType(int $type): string
+    {
+        return match ($type) {
+            self::MEDIA_TYPE_IMAGE => 'images/',
+            self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'images/thumbnails/',
+            self::MEDIA_TYPE_VIDEO => 'videos/',
+            self::MEDIA_TYPE_AUDIO => 'audios/',
+            default => 'unknown/',
+        };
+    }
+
+    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $original_name = $file->getClientOriginalName();
+        $extension = $file->getClientOriginalExtension();
+        $mime = $file->getMimeType();
+        $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
+        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, Uuid::uuid4()->toString())->toString();
+
+        $path_type = self::mediaPathType($type);
+
+        $max_upload_size = match ($type) {
+            self::MEDIA_TYPE_IMAGE => config('api.max_image_upload_size'),
+            self::MEDIA_TYPE_IMAGE_THUMBNAIL => config('api.max_image_thumbnail_upload_size'),
+            self::MEDIA_TYPE_VIDEO => config('api.max_video_upload_size'),
+            self::MEDIA_TYPE_AUDIO => config('api.max_audio_upload_size'),
+            default => config('api.max_unknown_upload_size'),
+        };
+
+        if ($file->getSize() > $max_upload_size) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('File size is too large.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        $path = $path_type . $base_checksum . '.' . $extension;
+        if ($file->storeAs('public', $path) === false) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to store file.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $path = storage_path('app/public/' . $path);
+
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
+    }
+
+    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        try {
+            $http = Http::get($url);
+            if ($http->failed()) {
+                $message = (object) [
+                    'type' => 'error',
+                    'message' => __('Failed to get image from url.'),
+                ];
+                if (config('app.debug')) {
+                    $message->debug = $http->body();
+                }
+                $r->messages[] = $message;
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+            $real_url = $http->effectiveUri();
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get image from url.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        $original_name = basename($real_url);
+        $original_name = preg_replace('/\?.*/', '', $original_name);
+        $original_name = preg_replace('/#.*/', '', $original_name);
+        $mime = $http->header('Content-Type');
+
+        try {
+            $extension = self::getExtensionByMime($mime);
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'warning',
+                'message' => __('Failed to get image extension.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'warning',
+                'message' => __('Failed to get image type.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, $real_url)->toString();
+
+        $path_type = self::mediaPathType($type);
+
+        if (Storage::put('public/' . $path_type . $base_checksum . '.' . $extension, $http->body()) === false) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to save image.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = 'The image could not be saved.';
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $path = storage_path('app/public/' . $path_type . $base_checksum . '.' . $extension);
+
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
+    }
+
     public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
@@ -557,11 +697,7 @@ class API extends Controller
         }
 
         try {
-            if ($is_thumbnail === true) {
-                $type = self::MEDIA_TYPE_IMAGE_THUMBNAIL;
-            } else {
-                $type = self::getTypeByMime($mime);
-            }
+            $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'warning',
@@ -573,15 +709,8 @@ class API extends Controller
             $r->messages[] = $message;
         }
 
-        $path_type = match ($type) {
-            self::MEDIA_TYPE_IMAGE => 'images/',
-            self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'images/thumbnails/',
-            self::MEDIA_TYPE_VIDEO => 'videos/',
-            self::MEDIA_TYPE_AUDIO => 'audios/',
-            default => 'unknown/',
-        };
-
-        $checksum = self::getFileChecksum($path);
+        $path_type = self::mediaPathType($type);
+        $checksum = self::getFileChecksum($path, $is_thumbnail);
 
         if (($media = mLiveStreamMedias::where('checksum', '=', $checksum)->first()) !== null) {
             $message = (object) [
@@ -670,7 +799,7 @@ class API extends Controller
                         continue;
                     }
 
-                    $thumbnail->checksum = self::getFileChecksum($thumbnail_path);
+                    $thumbnail->checksum = self::getFileChecksum($thumbnail_path, true);
                     $thumbnail->extension = 'jpg';
                     $thumbnail->height = $video->getStreams()->videos()->first()->get('height');
                     $thumbnail->mime = 'image/jpeg';
@@ -770,146 +899,6 @@ class API extends Controller
         }
 
         return $media;
-    }
-
-    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
-    {
-        $r = $r ?? self::INIT();
-
-        $original_name = $file->getClientOriginalName();
-        $extension = $file->getClientOriginalExtension();
-        $mime = $file->getMimeType();
-        $type = self::getTypeByMime($mime);
-        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, Uuid::uuid4()->toString())->toString();
-
-        $path_type = match ($type) {
-            self::MEDIA_TYPE_IMAGE => 'images/',
-            self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'images/thumbnails/',
-            self::MEDIA_TYPE_VIDEO => 'videos/',
-            self::MEDIA_TYPE_AUDIO => 'audios/',
-            default => 'unknown/',
-        };
-
-        $max_upload_size = match ($type) {
-            self::MEDIA_TYPE_IMAGE => config('api.max_image_upload_size'),
-            self::MEDIA_TYPE_IMAGE_THUMBNAIL => config('api.max_image_thumbnail_upload_size'),
-            self::MEDIA_TYPE_VIDEO => config('api.max_video_upload_size'),
-            self::MEDIA_TYPE_AUDIO => config('api.max_audio_upload_size'),
-            default => config('api.max_unknown_upload_size'),
-        };
-
-        if ($file->getSize() > $max_upload_size) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('File size is too large.'),
-            ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
-        }
-
-        $path = $path_type . $base_checksum . '.' . $extension;
-        if ($file->storeAs('public', $path) === false) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to store file.'),
-            ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $path = storage_path('app/public/' . $path);
-
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
-    }
-
-    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
-    {
-        $r = $r ?? self::INIT();
-
-        try {
-            $http = Http::get($url);
-            if ($http->failed()) {
-                $message = (object) [
-                    'type' => 'error',
-                    'message' => __('Failed to get image from url.'),
-                ];
-                if (config('app.debug')) {
-                    $message->debug = $http->body();
-                }
-                $r->messages[] = $message;
-                return response()->json($r, Response::HTTP_BAD_REQUEST);
-            }
-            $real_url = $http->effectiveUri();
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to get image from url.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
-        }
-
-        $original_name = basename($real_url);
-        $original_name = preg_replace('/\?.*/', '', $original_name);
-        $original_name = preg_replace('/#.*/', '', $original_name);
-        $mime = $http->header('Content-Type');
-
-        try {
-            $extension = self::getExtensionByMime($mime);
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'warning',
-                'message' => __('Failed to get image extension.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        try {
-            $type = self::getTypeByMime($mime);
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'warning',
-                'message' => __('Failed to get image type.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, $real_url)->toString();
-
-        $path_type = match ($type) {
-            self::MEDIA_TYPE_IMAGE => 'images/',
-            self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'images/thumbnails/',
-            self::MEDIA_TYPE_VIDEO => 'videos/',
-            self::MEDIA_TYPE_AUDIO => 'audios/',
-            default => 'unknown/',
-        };
-
-        if (Storage::put('public/' . $path_type . $base_checksum . '.' . $extension, $http->body()) === false) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to save image.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = 'The image could not be saved.';
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $path = storage_path('app/public/' . $path_type . $base_checksum . '.' . $extension);
-
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
     }
 
     /**

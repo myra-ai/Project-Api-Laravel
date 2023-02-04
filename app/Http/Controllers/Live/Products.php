@@ -213,7 +213,7 @@ class Products extends API
             $params['offset'] = $params['offset'] ?? 0;
             $params['limit'] = $params['limit'] ?? 50;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
-            $params['order'] = $params['order'] ?? 'desc';
+            $params['order'] = $params['order'] ?? 'asc';
 
             $products = match (true) {
                 isset($params['token']) => Cache::remember('products_by_company_' . $company_id . '_with_token', now()->addSeconds(3), function () use ($company_id, $params) {
