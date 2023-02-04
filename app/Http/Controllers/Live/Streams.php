@@ -20,7 +20,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-            'title' => ['required', 'string', 'min:4', 'max:100'],
+            'title' => ['required', 'string', 'min:4', 'max:110'],
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
             'note' => ['nullable', 'string', 'min:8', 'max:1000'],
             'sheduled_at' => ['nullable', new Timestamp],
@@ -28,7 +28,7 @@ class Streams extends API
             'orientation' => ['nullable', 'string', 'in:landscape,portrait'],
             'latency_mode' => ['nullable', 'string', 'in:low,normal'],
             'max_duration' => ['nullable', 'integer', 'min:60', 'max:43200'],
-            'thumbnail' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
+            'thumbnail_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -39,6 +39,7 @@ class Streams extends API
         $params['audio_only'] = $params['audio_only'] ?? false;
         $params['orientation'] = $params['orientation'] ?? 'landscape';
         $params['max_duration'] = $params['max_duration'] ?? 43200;
+        $params['thumbnail_id'] = $params['thumbnail_id'] ?? null;
 
         $stream_id = Str::uuid()->toString();
 
@@ -68,7 +69,7 @@ class Streams extends API
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
                 try {
-                    mLiveStreams::create([
+                    $stream = mLiveStreams::create([
                         'id' => $stream_id,
                         'company_id' => $params['company_id'],
                         'live_id' => $stream_id,
@@ -80,6 +81,7 @@ class Streams extends API
                         'audio_only' => $params['audio_only'],
                         'orientation' => $params['orientation'],
                         'max_duration' => $params['max_duration'],
+                        'thumbnail_id' => $params['thumbnail_id'],
                         'status' => 'created',
                     ]);
                 } catch (\Exception $e) {
@@ -108,7 +110,9 @@ class Streams extends API
             'message' => __('Stream created successfully.'),
         ];
         $r->data = (object) [
-            'stream_id' => $stream_id,
+            'id' => $stream_id,
+            'sheduled_at' => $stream->sheduled_at,
+            'thumbnail' => $stream->getThumbnailDetails(),
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
@@ -245,6 +249,7 @@ class Streams extends API
             $streams = match (true) {
                 isset($params['token']) => Cache::remember('streams_by_company_' . $params['company_id'] . '_with_token', now()->addSeconds(1), function () use ($params) {
                     return mLiveStreams::where('company_id', '=', $params['company_id'])
+                        ->where('deleted_at', '=', null)
                         ->offset($params['offset'])
                         ->limit($params['limit'])
                         ->orderBy($params['order_by'], $params['order'])
@@ -365,13 +370,13 @@ class Streams extends API
                     $service = AntMediaStream::doDeleteLive($stream_id, $stream->latency_mode);
                     if ($service->success === false) {
                         $message = (object) [
-                            'type' => 'error',
+                            'type' => 'warning',
                             'message' => $service->message ?? __('Stream could not be deleted.'),
                         ];
                         if (config('app.debug')) {
-                            $message->debug = $service->message ?? 'Occured an error while deleting stream with AntMedia.';
+                            $message->debug = 'Occured an error while deleting stream with AntMedia.';
                         }
-                        return response()->json($r, Response::HTTP_BAD_REQUEST);
+                        $r->messages[] = $message;
                     }
                     $service_message = $service->message;
                     break;
@@ -398,13 +403,32 @@ class Streams extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        try {
+            $stream = mLiveStreams::where('id', '=', $params['stream_id'])->first();
+            $stream->status = 'deleted';
+            $stream->deleted_at = now();
+            $stream->save();
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Stream could not be deleted.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
         $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('Stream successfully deleted.'),
         ];
+        $r->messages = array_reverse($r->messages);
+
         $r->data = [
-            'stream_id' => $stream_id,
             'service_message' => $service_message,
+            'deleted_at' => $stream->deleted_at,
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);

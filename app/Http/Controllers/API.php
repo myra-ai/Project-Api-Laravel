@@ -373,6 +373,9 @@ class API extends Controller
         try {
             $stream = Cache::remember('stream_by_id_' . $stream_id, now()->addSeconds(self::CACHE_TIME), function () use ($stream_id) {
                 $stream = mLiveStreams::where('id', '=', $stream_id)->where('deleted_at', '=', null)->first();
+                if ($stream === null) {
+                    return null;
+                }
                 $stream->source = $stream->getSource();
                 $stream->thumbnail = $stream->getThumbnail();
                 return $stream;
