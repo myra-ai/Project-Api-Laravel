@@ -27,7 +27,6 @@ return new class extends Migration
             $table->integer('status')->default(1);
             $table->uuid('link_id')->nullable()->default(null)->index();
             $table->foreign('link_id')->references('id')->on('links')->onDelete('cascade');
-            $table->boolean('promoted')->default(false);
             $table->bigInteger('views')->default(0);
             $table->bigInteger('clicks')->default(0);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);

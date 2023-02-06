@@ -9,6 +9,7 @@ use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
+use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
 use App\Models\LiveStreams as mLiveStreams;
 use App\Models\Stories as mStories;
 use FFMpeg\Coordinate\Dimension;
@@ -306,6 +307,14 @@ class API extends Controller
 
         if (isset($params['is_streammer']) && $params['is_streammer'] !== null) {
             $params['is_streammer'] = filter_var($params['is_streammer'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($params['group_attached']) && $params['group_attached'] !== null) {
+            $params['group_attached'] = filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if (isset($params['get_product']) && $params['get_product'] !== null) {
+            $params['get_product'] = filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN);
         }
 
         return $params;
@@ -952,6 +961,47 @@ class API extends Controller
         }
 
         return $product;
+    }
+
+    /**
+     * Get live stream data from local database
+     * 
+     * @param object $r
+     * @param array $params
+     * 
+     * @return object
+     */
+    public static function getProductGroup(?object &$r = null, string $group_id): object
+    {
+        $r = $r ?? self::INIT();
+
+        $group = null;
+
+        try {
+            $group = Cache::remember('product_group_' . $group_id, now()->addSeconds(self::CACHE_TIME), function () use ($group_id) {
+                return mLiveStreamProductGroups::where('id', '=', $group_id)->first();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get product group data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($group === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Product group could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $group;
     }
 
     /**

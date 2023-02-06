@@ -34,7 +34,6 @@ class LiveStreamProducts extends Authenticatable
         'currency',
         'status',
         'link_id',
-        'promoted',
         'views',
         'clicks',
         'deleted_at',
@@ -64,7 +63,6 @@ class LiveStreamProducts extends Authenticatable
         'currency' => 'string',
         'status' => 'integer',
         'link_id' => 'string',
-        'promoted' => 'boolean',
         'views' => 'integer',
         'clicks' => 'integer',
         'deleted_at' => 'timestamp',
@@ -139,18 +137,23 @@ class LiveStreamProducts extends Authenticatable
     {
         return $this->join('livestream_product_groups', 'livestream_product_groups.product_id', '=', 'livestreams_products.id')
             ->where('livestream_product_groups.stream_id', $stream_id)
-            ->select('livestreams_products.*');
+            ->select('livestreams_products.*', 'livestream_product_groups.id as group_id');
     }
 
     public function getProductsByStoryID(string $story_id): mixed
     {
         return $this->join('livestream_product_groups', 'livestream_product_groups.product_id', '=', 'livestreams_products.id')
             ->where('livestream_product_groups.story_id', $story_id)
-            ->select('livestreams_products.*');
+            ->select('livestreams_products.*', 'livestream_product_groups.id as group_id');
     }
 
     public function getGroups()
     {
         return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id');
+    }
+
+    public function getGroup()
+    {
+        return $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id')->first();
     }
 }

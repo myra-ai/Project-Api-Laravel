@@ -29,14 +29,15 @@ class DatabaseSeeder extends Seeder
         if (Storage::directoryMissing('public/images')) {
             Storage::makeDirectory('public/images');
         }
+        if (Storage::directoryMissing('public/images/thumbnails')) {
+            Storage::makeDirectory('public/images/thumbnails');
+        }
+
         if (Storage::directoryMissing('public/videos')) {
             Storage::makeDirectory('public/videos');
         }
         if (Storage::directoryMissing('public/unknown')) {
             Storage::makeDirectory('public/unknown');
-        }
-        if (Storage::directoryMissing('public/images/thumbnails')) {
-            Storage::makeDirectory('public/images/thumbnails');
         }
 
         $tenant_id = '2278df21-2f4f-40dd-918a-6650eb1e3e91'; // Str::uuid()->toString();
@@ -157,7 +158,6 @@ class DatabaseSeeder extends Seeder
             'link_id' => $link->id,
             'currency' => 'BRL',
             'status' => 1,
-            'promoted' => false,
         ]);
         mLiveStreamProducts::create([
             'id' => $product_id[1],
@@ -168,7 +168,6 @@ class DatabaseSeeder extends Seeder
             'link_id' => $link2->id,
             'currency' => 'BRL',
             'status' => 1,
-            'promoted' => true,
         ]);
         mLiveStreamProducts::create([
             'id' => $product_id[2],
@@ -179,7 +178,6 @@ class DatabaseSeeder extends Seeder
             'link_id' => $link3->id,
             'currency' => 'USD',
             'status' => 1,
-            'promoted' => false,
         ]);
         mLiveStreamProductsImages::create([
             'id' => Str::uuid()->toString(),
