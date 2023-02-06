@@ -150,4 +150,9 @@ class LiveStreams extends Authenticatable
             'height' => $media->height,
         ];
     }
+
+    public function getProducts()
+    {
+        return $this->hasMany(LiveStreamProductGroups::class, 'stream_id', 'id')->get();
+    }
 }

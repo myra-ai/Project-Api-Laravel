@@ -18,6 +18,7 @@ class LiveStreamProducts extends Authenticatable
     protected $table = 'livestreams_products';
     protected $primaryKey = 'id';
     public $timestamps = true;
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     /**
      * The attributes that are mass assignable.
@@ -146,5 +147,10 @@ class LiveStreamProducts extends Authenticatable
         return $this->join('livestream_product_groups', 'livestream_product_groups.product_id', '=', 'livestreams_products.id')
             ->where('livestream_product_groups.story_id', $story_id)
             ->select('livestreams_products.*');
+    }
+
+    public function getGroups()
+    {
+        return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id');
     }
 }

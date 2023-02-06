@@ -157,38 +157,58 @@ class Products extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function doCreateGroup(Request $request): JsonResponse
+    public function addStreamProduct(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
-            'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
-            'title' => ['nullable', 'string', 'min:4', 'max:255'],
-            'products' => ['nullable', 'array'],
+            'product_id' => ['required', 'string', 'size:36', 'uuid'],
+            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        $group = null;
+        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
+            return $stream;
+        }
 
-        // try {
-        //     $group = mLiveStreamProductGroups::create([
-        //         'id' => Str::uuid()->toString();,
-        //         'stream_id' => $params['stream_id'] ?? null,
-        //         'story_id' => $params['story_id'] ?? null,
-        //     ]);
-        // } catch (\Exception $e) {
-        //     $message = (object) [
-        //         'type' => 'error',
-        //         'message' => __('Product group could not be created.'),
-        //     ];
-        //     if (config('app.debug')) {
-        //         $message->debug = $e->getMessage();
-        //     }
-        //     $r->messages[] = $message;
-        //     return response()->json($r, Response::HTTP_BAD_REQUEST);
-        // }
+        if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
+            return $product;
+        }
 
-        $r->data = $params;
+        $group = new mLiveStreamProductGroups();
+        $getGroup = $group->where('product_id', '=', $product->id)->where('stream_id', $stream->id)->first();
+
+        if ($getGroup !== null) {
+            $message = (object) [
+                'type' => 'warning',
+                'message' => __('The product is already in the stream.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_OK);
+        }
+
+        $id = Str::uuid()->toString();
+
+        $group->id = $id;
+        $group->stream_id = $stream->id;
+        $group->product_id = $product->id;
+        if (!$group->save()) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Product could not be added to the stream.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Product added to the stream successfully.'),
+        ];
+        $r->data = (object) [
+            'group_id' => $id,
+            'created_at' => now()->toISOString(),
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

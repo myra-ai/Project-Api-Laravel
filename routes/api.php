@@ -61,13 +61,13 @@ Route::post('/comment', [L\Comments::class, 'addComment']);
 Route::get('/comments', [L\Comments::class, 'getComments']);
 Route::get('/comments/count', [L\Comments::class, 'getCommentsCount']);
 
+Route::post('/product/stream', [L\Products::class, 'addStreamProduct']);
 Route::post('/product/{company_id}', [L\Products::class, 'doCreateProduct']);
 Route::post('/product/image/{media_id}', [L\Products::class, 'addImage']);
 Route::get('/products/company/{company_id}', [L\Products::class, 'getByCompanyID']);
 Route::get('/products/stream/{company_id}', [L\Products::class, 'getByStreamID']);
 Route::get('/products/story/{company_id}', [L\Products::class, 'getByStoryID']);
 
-Route::post('/product/group/{company_id}', [L\Products::class, 'doCreateGroup']);
 Route::get('/product/group/{group_id}', [L\Products::class, 'getGroupByID']);
 Route::delete('/product/group/{group_id}', [L\Products::class, 'doDeleteGroup']);
 

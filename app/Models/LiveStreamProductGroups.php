@@ -13,6 +13,7 @@ class LiveStreamProductGroups extends Authenticatable
     protected $table = 'livestream_product_groups';
     protected $primaryKey = 'id';
     public $timestamps = true;
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     /**
      * The attributes that are mass assignable.
@@ -24,7 +25,6 @@ class LiveStreamProductGroups extends Authenticatable
         'product_id',
         'stream_id',
         'story_id',
-        'title',
     ];
 
     protected $hidden = [
@@ -42,6 +42,5 @@ class LiveStreamProductGroups extends Authenticatable
         'product_id' => 'string',
         'stream_id' => 'string',
         'story_id' => 'string',
-        'title' => 'string',
     ];
 }

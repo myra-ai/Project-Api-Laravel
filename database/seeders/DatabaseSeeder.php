@@ -164,7 +164,7 @@ class DatabaseSeeder extends Seeder
             'company_id' => $company_id,
             'title' => __('My Second Product'),
             'description' => 'It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using \'Content here, content here\', making it look like readable English',
-            'price' => rand(50, 250).rand(1, 99),
+            'price' => rand(50, 250) . rand(1, 99),
             'link_id' => $link2->id,
             'currency' => 'BRL',
             'status' => 1,
@@ -216,37 +216,31 @@ class DatabaseSeeder extends Seeder
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[0],
             'stream_id' => $stream_id,
-            'title' => 'My First Product Group For Streams',
         ]);
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[1],
             'stream_id' => $stream_id,
-            'title' => 'My Second Product Group For Streams',
         ]);
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[2],
             'stream_id' => $stream_id,
-            'title' => 'My Third Product Group For Streams',
         ]);
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[0],
             'story_id' => $story_id,
-            'title' => 'My First Product Group For Stories',
         ]);
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[1],
             'story_id' => $story_id2,
-            'title' => 'My Second Product Group For Stories',
         ]);
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[2],
             'story_id' => $story_id2,
-            'title' => 'My Third Product Group For Stories',
         ]);
         mUser::create([
             'name' => 'Admin',
