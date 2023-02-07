@@ -134,21 +134,11 @@ class Comments extends API
         $pinned = null;
 
         try {
-            if (!isset($params['offset'])) {
-                $params['offset'] = 0;
-            }
-            if (!isset($params['limit'])) {
-                $params['limit'] = 250;
-            }
-            if (!isset($params['order_by'])) {
-                $params['order_by'] = 'created_at';
-            }
-            if (!isset($params['order'])) {
-                $params['order'] = 'asc';
-            }
-            if (!isset($params['separe_pinned'])) {
-                $params['separe_pinned'] = false;
-            }
+            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
+            $params['limit'] = isset($params['limit']) ? $params['limit'] : 100;
+            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
+            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+            $params['separe_pinned'] = isset($params['separe_pinned']) ? $params['separe_pinned'] : false;
 
             $cache_tag = match (true) {
                 $stream !== null => 'stream_comments_list_' . $stream->id,
