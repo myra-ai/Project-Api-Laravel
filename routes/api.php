@@ -100,7 +100,10 @@ Route::post('/account/logout/{token}', [C\Account::class, 'doLogout']);
 Route::post('/account/password/reset', [C\Account::class, 'doCompanyResetPassword']);
 Route::post('/account/password/reset/{token}', [C\Account::class, 'doCompanyResetPasswordVerify']);
 Route::post('/account/password/change', [C\Account::class, 'doCompanyChangePassword']);
-Route::get('/account/users', [C\Account::class, 'getCompanyUsers']);
+Route::get('/account/users', [C\Account::class, 'getUsers']);
+Route::put('/account/user/{user_id}', [C\Account::class, 'doUpdateUser']);
+Route::put('/account/user/{user_id}/password', [C\Account::class, 'doUpdateUserPassword']);
+Route::delete('/account/user/{user_id}', [C\Account::class, 'doDeleteUser']);
 
 Route::get('/company/{company_id}', [L\Company::class, 'getCompanyByID']);
 Route::put('/company/{company_id}', [L\Company::class, 'doUpdateCompany']);

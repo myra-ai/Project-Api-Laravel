@@ -1253,6 +1253,78 @@ class API extends Controller
         return $company_user;
     }
 
+    public static function getCompanyUserByToken(string $token, ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $company_user = null;
+
+        try {
+            $company_user = Cache::remember('company_user_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token) {
+                $tokens = mLiveStreamCompanyTokens::where('token', '=', $token)->first();
+
+                if ($tokens === null) {
+                    return null;
+                }
+
+                return mLiveStreamCompanyUsers::where('id', '=', $tokens->user_id)->first();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get user data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($company_user === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('User could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $company_user;
+    }
+
+    public static function getCompanyUserById(string $id, ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $company_user = null;
+
+        try {
+            $company_user = Cache::remember('company_user_by_id_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $id)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($id) {
+                return mLiveStreamCompanyUsers::where('id', '=', $id)->first();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get user data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($company_user === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('User could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $company_user;
+    }
+
     public static function getCompanyByToken(string $token, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
@@ -1295,7 +1367,7 @@ class API extends Controller
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        if ($company === null || $company->deleted_at !== null) {
+        if ($company === null) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Token is invalid.'),

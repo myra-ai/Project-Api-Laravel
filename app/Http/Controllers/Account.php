@@ -135,6 +135,7 @@ class Account extends API
             $company_user->password = Hash::make($params['password']);
             $company_user->phone_country_code = $params['phone_country'];
             $company_user->phone = $params['phone'];
+            $company_user->is_master = true;
             $company_user->save();
         } catch (\Exception $e) {
             $message = [
@@ -153,7 +154,7 @@ class Account extends API
         $company_user = mLiveStreamCompanyUsers::find($company_user_id);
         $token_expires_at = now()->addMinutes(config('session.lifetime'));
 
-        if (($token = $company_user->createUserToken($token_expires_at)) === null) {
+        if (($token = $company_user->generateToken($token_expires_at)) === null) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Failed to create user token.'),
@@ -223,7 +224,7 @@ class Account extends API
 
         $r->success = true;
         $r->data = (object) [
-            'token' => $company_user->generateToken()
+            'token' => $company_user->generateToken($token_expires_at)
         ];
         return response()->json($r, Response::HTTP_OK);
     }
@@ -266,14 +267,19 @@ class Account extends API
             return $params;
         }
 
-        if (($company = API::getCompanyByToken($params['token'], $r, $token)) instanceof JsonResponse) {
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
             return $company;
+        }
+
+        if (($company_user = API::getCompanyUserByToken($params['token'], $r)) instanceof JsonResponse) {
+            return $company_user;
         }
 
         $r->success = true;
         $r->data = (object) [
             'id' => $company->id,
             'name' => $company->name,
+            'role' => $company_user->role,
             'avatar' => $company->getAvatar(),
             'logo' => $company->getLogo(),
         ];
@@ -395,7 +401,7 @@ class Account extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getCompanyUsers(Request $request): JsonResponse
+    public function getUsers(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60'],
@@ -403,14 +409,187 @@ class Account extends API
             return $params;
         }
 
-        if (($company = API::getCompanyAccountByToken($params['token'], $r)) instanceof JsonResponse) {
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
             return $company;
         }
 
         $r->success = true;
-        $r->data = (object) [
-            'users' => $company->getCompanyUsers(),
+        $r->data = $company->getCompanyUsers();
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function doUpdateUser(Request $request, ?string $user_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60'],
+            'user_id' => ['required', 'string', 'uuid', 'size:36'],
+            'name' => ['required', 'string', 'min:1', 'max:110'],
+            'email' => ['nullable', 'string', 'email', 'min:1', 'max:255'],
+            'password' => ['nullable', 'string', 'min:4', 'max:255'],
+            'password_confirmation' => ['nullable', 'string', 'min:4', 'max:255', 'same:password'],
+            'role' => ['nullable', 'integer', 'min:0', 'max:9'],
+        ], $request->all(), ['user_id' => $user_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
+            return $company;
+        }
+
+        if (($company_user = API::getCompanyUserById($params['user_id'], $r)) instanceof JsonResponse) {
+            return $company_user;
+        }
+
+        if ($company_user->company_id !== $company->id) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('User does not belong to this company.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($params['email'] !== null && $params['email'] !== $company_user->email) {
+            if (($company_user = API::getCompanyUserByEmail($params['email'], $r)) instanceof JsonResponse) {
+                return $company_user;
+            }
+
+            if ($company_user !== null && $company_user->id !== $params['user_id']) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Email address is already in use.'),
+                ];
+                return response()->json($r, Response::HTTP_UNAUTHORIZED);
+            }
+        }
+
+        try {
+            $company_user = new mLiveStreamCompanyUsers();
+            $company_user->name = $params['name'];
+            $company_user->email = $params['email'];
+            $company_user->role = $params['role'];
+            $company_user->save();
+            $company_user->refresh();
+        } catch (\Exception $e) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to update user.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('User has been updated.'),
         ];
+        $r->success = true;
+        $r->data = $company_user;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function doUpdateUserPassword(Request $request, ?string $user_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60'],
+            'user_id' => ['required', 'string', 'uuid', 'size:36'],
+            'password' => ['required', 'string', 'min:4', 'max:255'],
+            'password_confirmation' => ['required', 'string', 'min:4', 'max:255', 'same:password'],
+        ], $request->all(), ['user_id' => $user_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
+            return $company;
+        }
+
+        if (($company_user = API::getCompanyUserById($params['user_id'], $r)) instanceof JsonResponse) {
+            return $company_user;
+        }
+
+        if ($company_user->company_id !== $company->id) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Invalid user.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (Hash::check($params['password'], $company_user->password)) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('New password cannot be the same as the old password.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $company_user->password = Hash::make($params['password']);
+            $company_user->save();
+        } catch (\Exception $e) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to update password.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Password has been updated.'),
+        ];
+
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function doDeleteUser(Request $request, ?string $user_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60'],
+            'user_id' => ['required', 'string', 'uuid', 'size:36'],
+        ], $request->all(), ['user_id' => $user_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
+            return $company;
+        }
+
+        if (($company_user = API::getCompanyUserById($params['user_id'], $r)) instanceof JsonResponse) {
+            return $company_user;
+        }
+
+        if ($company_user->company_id !== $company->id) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Invalid user.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($company_user->is_master === true) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Owner cannot be deleted, please transfer ownership first.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $company_user->deleted_at = now();
+        } catch (\Exception $e) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to delete user.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('User has been deleted.'),
+        ];
+
+        $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
 }

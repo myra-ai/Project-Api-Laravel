@@ -32,6 +32,7 @@ return new class extends Migration
             $table->string('country', 80)->nullable()->default(null);
             $table->timestamp('last_login', 6)->nullable()->default(null);
             $table->string('last_login_ip', 255)->nullable()->default(null);
+            $table->boolean('is_master')->default(false);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
             $table->timestamps(6);
         });
