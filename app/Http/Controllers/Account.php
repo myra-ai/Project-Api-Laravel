@@ -3,22 +3,186 @@
 namespace App\Http\Controllers;
 
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
+use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\PasswordResets as mPasswordResets;
+use App\Models\Tenants as mTenants;
+use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class Account extends API
 {
-    public function doCompanyLogin(Request $request): JsonResponse
+    public function doCreate(Request $request): JsonResponse
     {
+        if (($params = API::doValidate($r, [
+            'tenant_id' => ['nullable', 'uuid', 'size:32'],
+            'name' => ['required', 'string', 'min:4', 'max:110'],
+            'email' => ['required', 'email', 'max:255'],
+            'phone_country' => ['required', 'string', 'min:2', 'max:4'],
+            'phone' => ['required', 'string', 'min:4', 'max:32'],
+            'brand_name' => ['required', 'string', 'min:4', 'max:110'],
+            'password' => ['required', 'string', 'min:6', 'max:100'],
+            'password_confirmation' => ['nullable', 'string', 'min:6', 'max:100'],
+            'terms' => ['nullable', new strBoolean],
+        ], $request->all())) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (isset($params['phone_country']) && !preg_match('/^[A-Za-z]+$/', $params['phone_country'])) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Phone country code must be only letters.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        } else {
+            $params['phone_country'] = strtoupper($params['phone_country']);
+        }
+
+        if (isset($params['phone']) && !preg_match('/^[0-9]+$/', $params['phone'])) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Phone number must be only numbers.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (isset($params['password_confirmation']) && $params['password'] !== $params['password_confirmation']) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Password confirmation does not match.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (isset($params['terms'])) {
+            $params['terms'] = filter_var($params['terms'], FILTER_VALIDATE_BOOLEAN);
+            if (!$params['terms']) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('You must agree to the terms and conditions.'),
+                ];
+                return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+
+        if (mLiveStreamCompanyUsers::where('email', '=', $params['email'])->exists()) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Email address already taken.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (mLiveStreamCompanyUsers::where('phone', '=', $params['phone'])->exists()) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Phone number already taken.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (mLiveStreamCompanies::where('name', '=', $params['brand_name'])->exists()) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Brand name already taken.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $params['tenant_id'] = $params['tenant_id'] ?? '2278df21-2f4f-40dd-918a-6650eb1e3e91';
+
+        if (!mTenants::where('id', '=', $params['tenant_id'])->exists()) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Tenant does not exist.'),
+            ];
+            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $company_id = Str::uuid()->toString();
+
+        try {
+            $company = new mLiveStreamCompanies;
+            $company->id = $company_id;
+            $company->tenant_id = $params['tenant_id'];
+            $company->name = $params['brand_name'];
+            $company->save();
+        } catch (\Exception $e) {
+            $message = [
+                'type' => 'error',
+                'message' => __('Failed to create company.'),
+            ];
+            if (config('app.debug')) {
+                $message['debug'] = [
+                    'message' => $e->getMessage(),
+                ];
+            }
+            $r->messages[] = (object) $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            $company_user_id = Str::uuid()->toString();
+            $company_user = new mLiveStreamCompanyUsers;
+            $company_user->id = $company_user_id;
+            $company_user->role = 1;
+            $company_user->company_id = $company_id;
+            $company_user->email = $params['email'];
+            $company_user->name = $params['name'];
+            $company_user->password = Hash::make($params['password']);
+            $company_user->phone_country_code = $params['phone_country'];
+            $company_user->phone = $params['phone'];
+            $company_user->save();
+        } catch (\Exception $e) {
+            $message = [
+                'type' => 'error',
+                'message' => __('Failed to create user account.'),
+            ];
+            if (config('app.debug')) {
+                $message['debug'] = [
+                    'message' => $e->getMessage(),
+                ];
+            }
+            $r->messages[] = (object) $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $company_user = mLiveStreamCompanyUsers::find($company_user_id);
+        $token_expires_at = now()->addMinutes(config('session.lifetime'));
+
+        if (($token = $company_user->createUserToken($token_expires_at)) === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to create user token.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Account created successfully.'),
+        ];
+
+        $r->data = (object) [
+            'token' => $token,
+            'token_expires_at' => $token_expires_at->toDateTimeString(),
+            'company_id' => $company_id,
+            'company_user_id' => $company_user_id,
+        ];
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function doLogin(Request $request): JsonResponse
+    {
+        $token_expires_at = now()->addMinutes(config('session.lifetime'));
+
         $r = API::INIT();
         $r->success = true;
         $r->data = (object) [
-            'token' => mLiveStreamCompanies::where('email', '=', 'admin@gobliver.one')->first()->generateToken()
+            'token' => mLiveStreamCompanyUsers::where('email', '=', 'kleber.santos@gobliver.com')->first()->generateToken($token_expires_at)
         ];
         return response()->json($r, Response::HTTP_OK);
 
@@ -29,11 +193,11 @@ class Account extends API
             return $params;
         }
 
-        if (($company = API::getCompanyAccountByEmail($params['email'], true, $r)) instanceof JsonResponse) {
-            return $company;
+        if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
+            return $company_user;
         }
 
-        if ($company === null) {
+        if ($company_user === null) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Invalid email address or password.'),
@@ -41,7 +205,7 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$company->hasVerifiedEmail()) {
+        if (!$company_user->hasVerifiedEmail()) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Email address is not verified.'),
@@ -49,7 +213,7 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!Hash::check($params['password'], $company->password)) {
+        if (!Hash::check($params['password'], $company_user->password)) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Invalid email address or password.'),
@@ -59,39 +223,50 @@ class Account extends API
 
         $r->success = true;
         $r->data = (object) [
-            'token' => $company->generateToken()
+            'token' => $company_user->generateToken()
         ];
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function doCompanyLogout(Request $request): JsonResponse
+    public function doLogout(Request $request, ?string $token = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60'],
-        ], $request->all())) instanceof JsonResponse) {
+        ], $request->all(), ['token' => $token])) instanceof JsonResponse) {
             return $params;
         }
 
-        if (($company = API::getCompanyAccountByToken($params['token'], $r)) instanceof JsonResponse) {
-            return $company;
+        if (($token = API::getToken($params['token'], $r)) instanceof JsonResponse) {
+            return $token;
         }
 
-        $company->token = null;
-        $company->save();
+        try {
+            $token->delete();
+        } catch (\Exception $e) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to logout.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Logged out successfully.'),
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function doCompanyValidateToken(Request $request): JsonResponse
+    public function doValidateToken(Request $request, ?string $token = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60'],
-        ], $request->all())) instanceof JsonResponse) {
+        ], $request->all(), ['token' => $token])) instanceof JsonResponse) {
             return $params;
         }
 
-        if (($company = API::getCompanyAccountByToken($params['token'], $r)) instanceof JsonResponse) {
+        if (($company = API::getCompanyByToken($params['token'], $r, $token)) instanceof JsonResponse) {
             return $company;
         }
 
@@ -99,6 +274,8 @@ class Account extends API
         $r->data = (object) [
             'id' => $company->id,
             'name' => $company->name,
+            'avatar' => $company->getAvatar(),
+            'logo' => $company->getLogo(),
         ];
         return response()->json($r, Response::HTTP_OK);
     }
@@ -111,9 +288,8 @@ class Account extends API
             return $params;
         }
 
-        // Get company account - Skip check account exists
-        if (($company = API::getCompanyAccountByEmail($params['email'], true, $r)) instanceof JsonResponse) {
-            return $company;
+        if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
+            return $company_user;
         }
 
         $r->messages[] = (object) [
@@ -122,16 +298,23 @@ class Account extends API
         ];
         $r->success = true;
 
-        if ($company === null || !$company->hasVerifiedEmail()) {
+        if ($company_user === null || !$company_user->hasVerifiedEmail()) {
             return response()->json($r, Response::HTTP_OK);
         }
 
-        $token = Str::random(80);
-        $reset = new mPasswordResets();
-        $reset->email = $company->email;
-        $reset->token = $token;
-        $reset->created_at = now()->format('Y-m-d H:i:s');
-        $reset->save();
+        try {
+            $reset = new mPasswordResets();
+            $reset->email = $company_user->email;
+            $reset->token = Str::random(80);
+            $reset->created_at = now()->format('Y-m-d H:i:s.u');
+            $reset->save();
+        } catch (\Exception $e) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Failed to reset password.'),
+            ];
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
 
         return response()->json($r, Response::HTTP_OK);
     }

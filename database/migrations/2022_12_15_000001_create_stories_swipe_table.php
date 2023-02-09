@@ -18,7 +18,7 @@ return new class extends Migration
             $table->uuid('story_id')->nullable()->default(null)->index();
             $table->foreign('story_id')->references('id')->on('stories')->onDelete('cascade');
             $table->string('name', 255)->nullable()->default(null);
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

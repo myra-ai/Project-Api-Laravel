@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\API;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
 
 class LiveStreamCompanies extends Authenticatable
 {
@@ -13,6 +13,8 @@ class LiveStreamCompanies extends Authenticatable
 
     protected $table = 'livestream_companies';
     protected $primaryKey = 'id';
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+    public $timestamps = true;
 
     /**
      * The attributes that are mass assignable.
@@ -22,31 +24,31 @@ class LiveStreamCompanies extends Authenticatable
     protected $fillable = [
         'id',
         'tenant_id',
-        'company_id',
         'name',
-        'email',
-        'password',
-        'email_verified_at',
-        'token',
-        'phone',
         'address',
         'city',
         'state',
         'zip',
         'country',
+        'deleted_at',
+        'primary_color',
+        'cta_color',
+        'accent_color',
+        'text_chat_color',
+        'rtmp_key',
+        'avatar',
+        'logo',
+        'stories_is_embedded',
+        'livestream_autoopen',
+        'created_at',
+        'updated_at',
     ];
 
     protected $hidden = [
-        'company_id',
-        'password',
-        'email_verified_at',
-        'token',
-        'phone',
-        'address',
-        'city',
-        'state',
-        'zip',
-        'country',
+        'id',
+        'tenant_id',
+        'deleted_at',
+        'rtmp_key',
         'created_at',
         'updated_at',
     ];
@@ -59,27 +61,25 @@ class LiveStreamCompanies extends Authenticatable
     protected $casts = [
         'id' => 'string',
         'tenant_id' => 'string',
-        'company_id' => 'string',
         'name' => 'string',
-        'email' => 'string',
-        'password' => 'string',
-        'email_verified_at' => 'timestamp',
-        'token' => 'string',
-        'phone' => 'string',
         'address' => 'string',
         'city' => 'string',
         'state' => 'string',
         'zip' => 'string',
         'country' => 'string',
+        'deleted_at' => 'timestamp',
+        'primary_color' => 'string',
+        'cta_color' => 'string',
+        'accent_color' => 'string',
+        'text_chat_color' => 'string',
+        'rtmp_key' => 'string',
+        'avatar' => 'string',
+        'logo' => 'string',
+        'stories_is_embedded' => 'boolean',
+        'livestream_autoopen' => 'boolean',
+        'created_at' => 'timestamp',
+        'updated_at' => 'timestamp',
     ];
-
-
-    public function generateToken()
-    {
-        $this->token = Str::random(60);
-        $this->save();
-        return $this->token;
-    }
 
     public function getCompanyUsers()
     {
@@ -96,8 +96,45 @@ class LiveStreamCompanies extends Authenticatable
         return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->where('email', $email)->first();
     }
 
-    public function getCompanyUserByToken(string $token)
+    public function getAvatar()
     {
-        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->where('token', $token)->first();
+        $media = LiveStreamMedias::where('id', $this->avatar)->first();
+        
+        if (!$media) {
+            return null;
+        }
+
+        return (object) [
+            'media_id' => $media->id,
+            'url' => match ($media->s3_available) {
+                null => API::getMediaUrl($media->id),
+                default => API::getMediaCdnUrl($media->path)
+            },
+            'alt' => $media->alt,
+            'mime' => $media->mime,
+            'width' => $media->width,
+            'height' => $media->height,
+        ];
+    }
+
+    public function getLogo()
+    {
+        $media = LiveStreamMedias::where('id', $this->logo)->first();
+
+        if (!$media) {
+            return null;
+        }
+
+        return (object) [
+            'media_id' => $media->id,
+            'url' => match ($media->s3_available) {
+                null => API::getMediaUrl($media->id),
+                default => API::getMediaCdnUrl($media->path)
+            },
+            'alt' => $media->alt,
+            'mime' => $media->mime,
+            'width' => $media->width,
+            'height' => $media->height,
+        ];
     }
 }

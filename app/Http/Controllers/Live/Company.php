@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Live;
 
 use App\Http\Controllers\API;
-use App\Models\LiveStreamSettings as mLiveStreamSettings;
+use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreams as mLiveStreams;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,44 +40,19 @@ class Company extends API
             return $company;
         }
 
-        $settings = null;
-
-        try {
-            $settings = mLiveStreamSettings::where('company_id', '=', $company_id)->first();
-        } catch (\Exception $e) {
-            $message = [
-                'type' => 'error',
-                'message' => __('Failed to get company settings.'),
-            ];
-            if (config('app.debug')) {
-                $message['debug'] = [
-                    'message' => $e->getMessage(),
-                ];
-            }
-            $r->messages[] = (object) $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        if ($settings === null) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Company settings not found.'),
-            ];
-            return response()->json($r, Response::HTTP_NOT_FOUND);
-        }
-
-        if (isset($settings->avatar)) {
-            $settings->avatar = API::getMediaUrl($settings->avatar);
-        }
-        if (isset($settings->logo)) {
-            $settings->logo = API::getMediaUrl($settings->logo);
-        }
-
         $stream = new mLiveStreams();
-        // $settings->stream_id = $stream->getLatestStreamID($company_id);
-        $settings->stream_id = '1db4344c-43ed-41a8-a575-d54fe81a7ffa';
 
-        $r->data = $settings;
+        $r->data = (object) [
+            "stream_id" => $stream->getLatestStreamID($company->id),
+            "avatar" => API::getMediaUrl($company->avatar),
+            "logo" => API::getMediaUrl($company->logo),
+            "primary_color" => $company->primary_color,
+            "cta_color" => $company->cta_color,
+            "accent_color" => $company->accent_color,
+            "text_chat_color" => $company->text_chat_color,
+            "stories_is_embedded" => $company->stories_is_embedded,
+            "livestream_autoopen" => $company->livestream_autoopen,
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

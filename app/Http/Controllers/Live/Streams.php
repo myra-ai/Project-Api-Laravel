@@ -21,7 +21,7 @@ class Streams extends API
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
             'title' => ['required', 'string', 'min:4', 'max:110'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'note' => ['nullable', 'string', 'min:8', 'max:1000'],
             'sheduled_at' => ['nullable', new Timestamp],
             'audio_only' => ['nullable', 'boolean'],
@@ -122,7 +122,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'title' => ['nullable', 'string', 'min:4', 'max:100'],
             'note' => ['nullable', 'string', 'min:8', 'max:1000'],
             'sheduled_at' => ['nullable', new Timestamp],
@@ -176,7 +176,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -220,7 +220,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:viewers,likes,status,created_at,updated_at'],
@@ -323,7 +323,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
@@ -438,7 +438,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -469,7 +469,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -503,7 +503,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -528,7 +528,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -553,7 +553,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -573,7 +573,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -607,7 +607,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -641,7 +641,7 @@ class Streams extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_companies,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }

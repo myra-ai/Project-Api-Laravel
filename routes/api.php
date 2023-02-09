@@ -93,9 +93,10 @@ Route::get('/media/raw/{path}', [L\Medias::class, 'getMediaRawByPath'])->where('
 Route::get('/widget/{company_id}/stream', [L\Widget::class, 'getWidgetStream']);
 Route::get('/widget/{company_id}/story', [L\Widget::class, 'getWidgetStory']);
 
-Route::post('/account/login', [C\Account::class, 'doCompanyLogin']);
-Route::post('/account/validate/token', [C\Account::class, 'doCompanyValidateToken']);
-Route::post('/account/logout', [C\Account::class, 'doCompanyLogout']);
+Route::post('/account/create', [C\Account::class, 'doCreate']);
+Route::post('/account/login', [C\Account::class, 'doLogin']);
+Route::post('/account/validate/token/{token}', [C\Account::class, 'doValidateToken']);
+Route::post('/account/logout/{token}', [C\Account::class, 'doLogout']);
 Route::post('/account/password/reset', [C\Account::class, 'doCompanyResetPassword']);
 Route::post('/account/password/reset/{token}', [C\Account::class, 'doCompanyResetPasswordVerify']);
 Route::post('/account/password/change', [C\Account::class, 'doCompanyChangePassword']);

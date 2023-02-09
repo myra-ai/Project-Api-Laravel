@@ -158,6 +158,10 @@ class Stories extends API
             $r->messages[] = $message;
         }
 
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Story deleted.'),
+        ];
         $r->data = (object) [
             'id' => $story->id,
             'deleted_at' => $now,

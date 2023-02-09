@@ -38,7 +38,7 @@ return new class extends Migration
             $table->bigInteger('max_duration')->default(43200);
             $table->longText('note')->nullable()->default(null);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

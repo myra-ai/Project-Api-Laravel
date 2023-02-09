@@ -6,6 +6,8 @@ use App\Http\StreamServices\AntMedia\Stream as AntMediaStream;
 use App\Http\StreamServices\Mux\Stream as MuxStream;
 use App\Models\Links as mLinks;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
+use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
+use App\Models\LiveStreamCompanyTokens as mLiveStreamCompanyTokens;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
@@ -15,6 +17,7 @@ use App\Models\Stories as mStories;
 use FFMpeg\Coordinate\Dimension;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -1175,20 +1178,20 @@ class API extends Controller
         return $media;
     }
 
-    public static function getCompanyAccountByEmail(string $email, bool $skip_check_account = false, ?object &$r = null): object | null
+    public static function getToken(string $token, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
-        $account = null;
+        $t = null;
 
         try {
-            $account = Cache::remember('company_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($email) {
-                return mLiveStreamCompanies::where('email', '=', $email)->first();
+            $t = Cache::remember('token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token) {
+                return mLiveStreamCompanyTokens::where('token', '=', $token)->where('expires_at', '>', now()->format('Y-m-d H:i:s.u'))->first();
             });
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Failed to get account data.'),
+                'message' => __('Failed to get token data.'),
             ];
             if (config('app.debug')) {
                 $message->debug = $e->getMessage();
@@ -1197,40 +1200,31 @@ class API extends Controller
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        if ($skip_check_account === false && $account === null) {
+        if ($t === null) {
             $r->messages[] = (object) [
                 'type' => 'error',
-                'message' => __('Account could not be found.'),
+                'message' => __('Token invalid.'),
             ];
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        if ($skip_check_account === false && $account->deleted_at !== null) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('The account is excluded.'),
-            ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
-        }
-
-        return $account;
+        return $t;
     }
 
-    public static function getCompanyAccountByToken(string $token, ?object &$r = null): object
+    public static function getCompanyUserByEmail(string $email, bool $skip_check_account = false, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
-        $account = null;
+        $company_user = null;
 
         try {
-            $account = Cache::remember('company_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token) {
-                return mLiveStreamCompanies::where('token', '=', $token)->first();
+            $company_user = Cache::remember('company_user_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($email) {
+                return mLiveStreamCompanyUsers::where('email', '=', $email)->first();
             });
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Failed to get account data.'),
+                'message' => __('Failed to get user data.'),
             ];
             if (config('app.debug')) {
                 $message->debug = $e->getMessage();
@@ -1239,7 +1233,69 @@ class API extends Controller
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        if ($account === null || $account->deleted_at !== null) {
+        if ($skip_check_account && $company_user === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('User could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($skip_check_account && $company_user->deleted_at !== null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('The user is excluded.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $company_user;
+    }
+
+    public static function getCompanyByToken(string $token, ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $company = null;
+
+        try {
+            $company = Cache::remember('company_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token, &$r) {
+                $tokens = mLiveStreamCompanyTokens::where('token', '=', $token)->first();
+
+                if ($tokens === null) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Token is invalid.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
+                }
+
+                $users = mLiveStreamCompanyUsers::where('id', '=', $tokens->user_id)->first();
+
+                if ($users === null) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Token is invalid.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
+                }
+
+                return mLiveStreamCompanies::find($users->company_id);
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get company data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($company === null || $company->deleted_at !== null) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Token is invalid.'),
@@ -1247,7 +1303,7 @@ class API extends Controller
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        return $account;
+        return $company;
     }
 
     public static function getCompany(?object &$r = null, string $company_id): object

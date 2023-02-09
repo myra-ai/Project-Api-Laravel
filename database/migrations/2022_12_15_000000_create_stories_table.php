@@ -30,7 +30,7 @@ return new class extends Migration
             $table->bigInteger('total_clicks')->unsigned()->default(0);
             $table->bigInteger('total_opens')->unsigned()->default(0);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 
