@@ -589,7 +589,7 @@ class Account extends API
         $deleted_at = now();
 
         try {
-            $company_user->deleted_at = $deleted_at;
+            $company_user->deleted_at = $deleted_at->format('Y-m-d H:i:s.u');
             $company_user->save();
         } catch (\Exception $e) {
             $r->messages[] = (object) [

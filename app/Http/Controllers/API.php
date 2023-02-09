@@ -1289,6 +1289,15 @@ class API extends Controller
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        if ($company_user->deleted_at !== null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('The user is excluded.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
         return $company_user;
     }
 
@@ -1322,6 +1331,15 @@ class API extends Controller
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        if ($company_user->deleted_at !== null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('The user is excluded.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
         return $company_user;
     }
 
@@ -1343,7 +1361,7 @@ class API extends Controller
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
 
-                $users = mLiveStreamCompanyUsers::where('id', '=', $tokens->user_id)->first();
+                $users = mLiveStreamCompanyUsers::where('id', '=', $tokens->user_id)->where('deleted_at', '=', null)->first();
 
                 if ($users === null) {
                     $r->messages[] = (object) [

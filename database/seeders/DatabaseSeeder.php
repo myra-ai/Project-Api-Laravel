@@ -83,6 +83,7 @@ class DatabaseSeeder extends Seeder
             'state' => 'NY',
             'zip' => '10001',
             'country' => 'USA',
+            'is_master' => true,
         ]);
 
         mLiveStreamCompanyTokens::create([
