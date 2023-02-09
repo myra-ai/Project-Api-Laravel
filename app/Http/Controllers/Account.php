@@ -414,7 +414,19 @@ class Account extends API
         }
 
         $r->success = true;
-        $r->data = $company->getCompanyUsers();
+        $r->data = $company->users()->get()->map(function ($user) {
+            $user->makeVisible(['role', 'is_master', 'phone', 'created_at']);
+            return (object) [
+                'id' => $user->id,
+                'created_at' => $user->created_at,
+                'email_verified' => $user->hasVerifiedEmail(),
+                'email' => $user->email,
+                'is_master' => $user->is_master,
+                'name' => $user->name,
+                'phone' => $user->phone,
+                'role' => $user->role,
+            ];
+        });
         return response()->json($r, Response::HTTP_OK);
     }
 
@@ -574,8 +586,11 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
+        $deleted_at = now();
+
         try {
-            $company_user->deleted_at = now();
+            $company_user->deleted_at = $deleted_at;
+            $company_user->save();
         } catch (\Exception $e) {
             $r->messages[] = (object) [
                 'type' => 'error',
@@ -590,6 +605,9 @@ class Account extends API
         ];
 
         $r->success = true;
+        $r->data = (object) [
+            'deleted_at' => $deleted_at,
+        ];
         return response()->json($r, Response::HTTP_OK);
     }
 }

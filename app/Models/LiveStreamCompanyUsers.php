@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Casts\Json;
+use App\Casts\Timestamp;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -93,7 +94,7 @@ class LiveStreamCompanyUsers extends Authenticatable
         'last_login_ip' => 'string',
         'is_master' => 'boolean',
         'deleted_at' => 'timestamp',
-        'created_at' => 'timestamp',
+        'created_at' => Timestamp::class,
         'updated_at' => 'timestamp',
     ];
 

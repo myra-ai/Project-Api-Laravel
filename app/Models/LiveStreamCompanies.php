@@ -81,9 +81,14 @@ class LiveStreamCompanies extends Authenticatable
         'updated_at' => 'timestamp',
     ];
 
+    public function users()
+    {
+        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id');
+    }
+
     public function getCompanyUsers()
     {
-        return $this->hasMany(LiveStreamCompanyUsers::class, 'company_id', 'id')->get();
+        return $this->users()->get();
     }
 
     public function getCompanyUser(string $id)
