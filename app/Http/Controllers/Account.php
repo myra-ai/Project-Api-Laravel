@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ResetPassword;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\PasswordResets as mPasswordResets;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class Account extends API
@@ -19,7 +21,7 @@ class Account extends API
     {
         if (($params = API::doValidate($r, [
             'tenant_id' => ['nullable', 'uuid', 'size:32'],
-            'name' => ['required', 'string', 'min:4', 'max:110'],
+            'name' => ['required', 'string', 'min:4', 'max:40'],
             'email' => ['required', 'email', 'max:255'],
             'phone_country' => ['required', 'string', 'min:2', 'max:4'],
             'phone' => ['required', 'string', 'min:4', 'max:32'],
@@ -180,12 +182,14 @@ class Account extends API
     {
         $token_expires_at = now()->addMinutes(config('session.lifetime'));
 
-        $r = API::INIT();
-        $r->success = true;
-        $r->data = (object) [
-            'token' => mLiveStreamCompanyUsers::where('email', '=', 'kleber.santos@gobliver.com')->first()->generateToken($token_expires_at)
-        ];
-        return response()->json($r, Response::HTTP_OK);
+        // if (config('app.env') === 'local') {
+        //     $r = API::INIT();
+        //     $r->success = true;
+        //     $r->data = (object) [
+        //         'token' => mLiveStreamCompanyUsers::where('email', '=', 'kleber.santos@gobliver.com')->first()->generateToken($token_expires_at)
+        //     ];
+        //     return response()->json($r, Response::HTTP_OK);
+        // }
 
         if (($params = API::doValidate($r, [
             'email' => ['required', 'email', 'max:255'],
@@ -194,7 +198,7 @@ class Account extends API
             return $params;
         }
 
-        if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
+        if (($company_user = API::getCompanyUserByEmail($params['email'], false, $r)) instanceof JsonResponse) {
             return $company_user;
         }
 
@@ -286,7 +290,7 @@ class Account extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function doCompanyResetPassword(Request $request): JsonResponse
+    public function doResetPassword(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'email' => ['required', 'email', 'max:255'],
@@ -294,7 +298,7 @@ class Account extends API
             return $params;
         }
 
-        if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
+        if (($company_user = API::getCompanyUserByEmail($params['email'], false, $r)) instanceof JsonResponse) {
             return $company_user;
         }
 
@@ -302,35 +306,58 @@ class Account extends API
             'type' => 'success',
             'message' => __('If the email address is valid, you will receive an email with a link to reset your password.'),
         ];
+
         $r->success = true;
 
-        if ($company_user === null || !$company_user->hasVerifiedEmail()) {
+        if ($company_user === null) {
             return response()->json($r, Response::HTTP_OK);
         }
+
+        $token = Str::random(40);
+
+        try {
+            Mail::to($company_user->email)->send(new ResetPassword($company_user, $token));
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to send email.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
 
         try {
             $reset = new mPasswordResets();
             $reset->email = $company_user->email;
-            $reset->token = Str::random(80);
+            $reset->token = $token;
+            $reset->shorten_code = Str::random(8);
             $reset->created_at = now()->format('Y-m-d H:i:s.u');
             $reset->save();
         } catch (\Exception $e) {
-            $r->messages[] = (object) [
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to reset password.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function doCompanyResetPasswordVerify(Request $request, ?string $token = null): JsonResponse
+    public function doResetPasswordVerify(Request $request, ?string $token = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:80'],
-            'password' => ['required', 'string', 'min:4', 'max:255'],
-            'password_confirmation' => ['required', 'string', 'min:4', 'max:255', 'same:password'],
+            'token' => ['required', 'string', 'size:40'],
+            'password' => ['required', 'string', 'min:4', 'max:100'],
+            'password_confirmation' => ['required', 'string', 'min:4', 'max:100', 'same:password'],
         ], $request->all(), ['token' => $token])) instanceof JsonResponse) {
             return $params;
         }
@@ -343,7 +370,7 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if (strtotime($reset->created_at) < strtotime('-30 minutes')) {
+        if ($reset->created_at < now()->subMinutes(30)->timestamp) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Token has expired.'),
@@ -356,19 +383,19 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if ($params['password'] !== $params['password_confirmation']) {
+        if (($company_user = API::getCompanyUserByEmail($reset->email, false, $r)) instanceof JsonResponse) {
+            return $company_user;
+        }
+
+        if ($company_user === null) {
             $r->messages[] = (object) [
                 'type' => 'error',
-                'message' => __('Passwords do not match.'),
+                'message' => __('Invalid token.'),
             ];
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if (($company = API::getCompanyAccountByEmail($reset->email, r: $r)) instanceof JsonResponse) {
-            return $company;
-        }
-
-        if (Hash::check($params['password'], $company->password)) {
+        if (Hash::check($params['password'], $company_user->password)) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('New password cannot be the same as the old password.'),
@@ -377,8 +404,8 @@ class Account extends API
         }
 
         try {
-            $company->password = Hash::make($params['password']);
-            $reset->delete();
+            $company_user->password = Hash::make($params['password']);
+            $company_user->save();
         } catch (\Exception $e) {
             $r->messages[] = (object) [
                 'type' => 'error',
@@ -387,16 +414,21 @@ class Account extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        try {
+            $reset->delete();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        $token_expires_at = now()->addMinutes(config('session.lifetime'));
+
         $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('Password has been reset.'),
         ];
-
         $r->success = true;
         $r->data = (object) [
-            'id' => $company->id,
-            'name' => $company->name,
-            'token' => $company->generateToken(),
+            'login_token' => $company_user->generateToken($token_expires_at)
         ];
         return response()->json($r, Response::HTTP_OK);
     }

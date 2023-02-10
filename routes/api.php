@@ -97,9 +97,9 @@ Route::post('/account/create', [C\Account::class, 'doCreate']);
 Route::post('/account/login', [C\Account::class, 'doLogin']);
 Route::post('/account/validate/token/{token}', [C\Account::class, 'doValidateToken']);
 Route::post('/account/logout/{token}', [C\Account::class, 'doLogout']);
-Route::post('/account/password/reset', [C\Account::class, 'doCompanyResetPassword']);
-Route::post('/account/password/reset/{token}', [C\Account::class, 'doCompanyResetPasswordVerify']);
-Route::post('/account/password/change', [C\Account::class, 'doCompanyChangePassword']);
+Route::post('/account/password/reset', [C\Account::class, 'doResetPassword']);
+Route::post('/account/password/reset/{token}', [C\Account::class, 'doResetPasswordVerify']);
+Route::post('/account/password/change', [C\Account::class, 'doChangePassword']);
 Route::get('/account/users', [C\Account::class, 'getUsers']);
 Route::put('/account/user/{user_id}', [C\Account::class, 'doUpdateUser']);
 Route::put('/account/user/{user_id}/password', [C\Account::class, 'doUpdateUserPassword']);
@@ -123,11 +123,3 @@ Route::get('/metrics/acceses/average/days', [L\Metrics::class, 'getAverageAccess
 Route::get('/healthcheck', function () {
     return response()->json(['status' => 'ok'], Response::HTTP_OK);
 });
-
-// Route::get('/test', function () {
-//     $message = 'Hello World';
-//     $stream_id = '1db4344c-43ed-41a8-a575-d54fe81a7ffa';
-
-//     Event::dispatch(new SendMessage($message, $stream_id));
-//     return response()->json(['status' => 'ok'], Response::HTTP_OK);
-// });

@@ -22,6 +22,7 @@ class PasswordResets extends Authenticatable
     protected $fillable = [
         'email',
         'token',
+        'shorten_code',
         'created_at',
     ];
 
@@ -33,6 +34,7 @@ class PasswordResets extends Authenticatable
     protected $casts = [
         'email' => 'string',
         'token' => 'string',
+        'shorten_code' => 'string',
         'created_at' => 'timestamp',
     ];
 }

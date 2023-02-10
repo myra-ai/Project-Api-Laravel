@@ -1211,7 +1211,7 @@ class API extends Controller
         return $t;
     }
 
-    public static function getCompanyUserByEmail(string $email, bool $skip_check_account = false, ?object &$r = null): object
+    public static function getCompanyUserByEmail(string $email, bool $skip_check_account = false, ?object &$r = null): ?object
     {
         $r = $r ?? self::INIT();
 
