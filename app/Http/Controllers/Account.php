@@ -11,6 +11,7 @@ use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -437,6 +438,10 @@ class Account extends API
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:80'],
+            'order_by' => ['nullable', 'string', 'in:id,email,created_at'],
+            'order' => ['nullable', 'string', 'in:asc,desc'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
@@ -445,20 +450,53 @@ class Account extends API
             return $company;
         }
 
-        $r->success = true;
-        $r->data = $company->users()->get()->map(function ($user) {
-            $user->makeVisible(['role', 'is_master', 'phone', 'created_at']);
-            return (object) [
-                'id' => $user->id,
-                'created_at' => $user->created_at,
-                'email_verified' => $user->hasVerifiedEmail(),
-                'email' => $user->email,
-                'is_master' => $user->is_master,
-                'name' => $user->name,
-                'phone' => $user->phone,
-                'role' => $user->role,
-            ];
+        $params['offset'] = $params['offset'] ?? 0;
+        $params['limit'] = $params['limit'] ?? 80;
+        $params['order_by'] = $params['order_by'] ?? 'id';
+        $params['order'] = $params['order'] ?? 'asc';
+
+        $total = Cache::remember('company_users_total_' . $company->id, self::CACHE_TIME, function () use ($company) {
+            return $company->users()->count();
         });
+
+        $count = 0;
+
+        $r->success = true;
+        $r->data = $company->users()
+            ->offset($params['offset'])
+            ->limit($params['limit'])
+            ->orderBy($params['order_by'], $params['order'])
+            ->get()->map(function ($user) use (&$count) {
+                $user->makeVisible(['role', 'is_master', 'phone', 'phone_country', 'phone_country_dial', 'created_at', 'address', 'city', 'state', 'zip', 'country']);
+                $count++;
+                return (object) [
+                    'id' => $user->id,
+                    'created_at' => $user->created_at,
+                    'email_verified' => $user->hasVerifiedEmail(),
+                    'email' => $user->email,
+                    'is_master' => $user->is_master,
+                    'name' => $user->name,
+                    'phone' => $user->phone,
+                    'phone_country' => (object) [
+                        'code' => $user->phone_country,
+                        'dial' => $user->phone_country_dial,
+                    ],
+                    'role' => $user->role,
+                    'avatar' => $user->getAvatar(),
+                    'address' => $user->address,
+                    'city' => $user->city,
+                    'state' => $user->state,
+                    'zip' => $user->zip,
+                    'country' => $user->country,
+                ];
+            });
+
+        $r->data_info = (object) [
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
+            'count' => $count,
+            'total' => $total,
+        ];
         return response()->json($r, Response::HTTP_OK);
     }
 
@@ -467,8 +505,16 @@ class Account extends API
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60'],
             'user_id' => ['required', 'string', 'uuid', 'size:36'],
-            'name' => ['required', 'string', 'min:1', 'max:110'],
-            'email' => ['nullable', 'string', 'email', 'min:1', 'max:255'],
+            'name' => ['nullable', 'string', 'min:1', 'max:40'],
+            'email' => ['nullable', 'string', 'email', 'min:1', 'max:150'],
+            'phone' => ['nullable', 'string', 'min:1', 'max:32'],
+            'phone_country' => ['nullable', 'string', 'size:2'],
+            'phone_country_dial' => ['nullable', 'string', 'min:1', 'max:5'],
+            'country' => ['nullable', 'string', 'min:1', 'max:40'],
+            'state' => ['nullable', 'string', 'min:1', 'max:40'],
+            'city' => ['nullable', 'string', 'min:1', 'max:40'],
+            'address' => ['nullable', 'string', 'min:1', 'max:80'],
+            'zip' => ['nullable', 'string', 'min:1', 'max:10'],
             'password' => ['nullable', 'string', 'min:4', 'max:255'],
             'password_confirmation' => ['nullable', 'string', 'min:4', 'max:255', 'same:password'],
             'role' => ['nullable', 'integer', 'min:0', 'max:9'],
@@ -492,8 +538,21 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
+        $params['name'] = $params['name'] ?? null;
+        $params['email'] = $params['email'] ?? null;
+        $params['phone'] = $params['phone'] ?? null;
+        $params['phone_country'] = $params['phone_country'] ?? null;
+        $params['phone_country_dial'] = $params['phone_country_dial'] ?? null;
+        $params['country'] = $params['country'] ?? null;
+        $params['state'] = $params['state'] ?? null;
+        $params['city'] = $params['city'] ?? null;
+        $params['address'] = $params['address'] ?? null;
+        $params['zip'] = $params['zip'] ?? null;
+        $params['password'] = $params['password'] ?? null;
+        $params['role'] = $params['role'] ?? null;
+
         if ($params['email'] !== null && $params['email'] !== $company_user->email) {
-            if (($company_user = API::getCompanyUserByEmail($params['email'], $r)) instanceof JsonResponse) {
+            if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
                 return $company_user;
             }
 
@@ -506,18 +565,99 @@ class Account extends API
             }
         }
 
-        try {
-            $company_user = new mLiveStreamCompanyUsers();
-            $company_user->name = $params['name'];
-            $company_user->email = $params['email'];
-            $company_user->role = $params['role'];
-            $company_user->save();
-            $company_user->refresh();
-        } catch (\Exception $e) {
+        if (
+            ($params['name'] !== null && $params['name'] === $company_user->name) &&
+            ($params['email'] !== null && $params['email'] === $company_user->email) &&
+            ($params['role'] !== null && $params['role'] === $company_user->role) &&
+            ($params['phone'] !== null && $params['phone'] === $company_user->phone) &&
+            ($params['phone_country'] !== null && $params['phone_country'] === $company_user->phone_country) &&
+            ($params['phone_country_dial'] !== null && $params['phone_country_dial'] === $company_user->phone_country_dial) &&
+            ($params['country'] !== null && $params['country'] === $company_user->country) &&
+            ($params['state'] !== null && $params['state'] === $company_user->state) &&
+            ($params['city'] !== null && $params['city'] === $company_user->city) &&
+            ($params['address'] !== null && $params['address'] === $company_user->address) &&
+            ($params['zip'] !== null && $params['zip'] === $company_user->zip) &&
+            ($params['password'] !== null && Hash::check($params['password'], $company_user->password)) ||
+            ($params['name'] === null &&
+                $params['email'] === null &&
+                $params['role'] === null &&
+                $params['phone'] === null &&
+                $params['phone_country'] === null &&
+                $params['phone_country_dial'] === null &&
+                $params['country'] === null &&
+                $params['state'] === null &&
+                $params['city'] === null &&
+                $params['address'] === null &&
+                $params['zip'] === null &&
+                $params['password'] === null
+            )
+        ) {
             $r->messages[] = (object) [
+                'type' => 'warning',
+                'message' => __('Nothing to update.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            if ($params['name'] !== null && $params['name'] !== $company_user->name) {
+                $company_user->name = $params['name'];
+            }
+
+            if ($params['email'] !== null && $params['email'] !== $company_user->email) {
+                $company_user->email = $params['email'];
+            }
+
+            if ($params['role'] !== null && $params['role'] !== $company_user->role) {
+                $company_user->role = $params['role'];
+            }
+
+            if ($params['phone'] !== null && $params['phone'] !== $company_user->phone) {
+                $company_user->phone = $params['phone'];
+            }
+
+            if ($params['phone_country'] !== null && $params['phone_country'] !== $company_user->phone_country) {
+                $company_user->phone_country = $params['phone_country'];
+            }
+
+            if ($params['phone_country_dial'] !== null && $params['phone_country_dial'] !== $company_user->phone_country_dial) {
+                $company_user->phone_country_dial = $params['phone_country_dial'];
+            }
+
+            if ($params['country'] !== null && $params['country'] !== $company_user->country) {
+                $company_user->country = $params['country'];
+            }
+
+            if ($params['state'] !== null && $params['state'] !== $company_user->state) {
+                $company_user->state = $params['state'];
+            }
+
+            if ($params['city'] !== null && $params['city'] !== $company_user->city) {
+                $company_user->city = $params['city'];
+            }
+
+            if ($params['address'] !== null && $params['address'] !== $company_user->address) {
+                $company_user->address = $params['address'];
+            }
+
+            if ($params['zip'] !== null && $params['zip'] !== $company_user->zip) {
+                $company_user->zip = $params['zip'];
+            }
+
+            if ($params['password'] !== null && !Hash::check($params['password'], $company_user->password)) {
+                $company_user->password = Hash::make($params['password']);
+            }
+
+            $company_user->save();
+        } catch (\Exception $e) {
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to update user.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
@@ -526,7 +666,9 @@ class Account extends API
             'message' => __('User has been updated.'),
         ];
         $r->success = true;
-        $r->data = $company_user;
+        $r->data = (object) [
+            'updated_at' => now(),
+        ];
         return response()->json($r, Response::HTTP_OK);
     }
 

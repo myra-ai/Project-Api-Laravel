@@ -121,5 +121,8 @@ Route::get('/metrics/acceses/total/days', [L\Metrics::class, 'getTotalAccessByDa
 Route::get('/metrics/acceses/average/days', [L\Metrics::class, 'getAverageAccessByDays']);
 
 Route::get('/healthcheck', function () {
-    return response()->json(['status' => 'ok'], Response::HTTP_OK);
+    return response()->json([
+        'code' => 200,
+        'requested_at' => now(),
+    ], Response::HTTP_OK);
 });

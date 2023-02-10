@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\Json;
 use App\Casts\Timestamp;
+use App\Http\Controllers\API;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -32,8 +33,10 @@ class LiveStreamCompanyUsers extends Authenticatable
         'email',
         'password',
         'email_verified_at',
-        'phone_country_code',
+        'phone_country',
+        'phone_country_dial',
         'phone',
+        'avatar',
         'address',
         'city',
         'state',
@@ -54,7 +57,8 @@ class LiveStreamCompanyUsers extends Authenticatable
         'role',
         'password',
         'email_verified_at',
-        'phone_country_code',
+        'phone_country',
+        'phone_country_dial',
         'phone',
         'address',
         'city',
@@ -83,8 +87,10 @@ class LiveStreamCompanyUsers extends Authenticatable
         'email' => 'string',
         'password' => 'string',
         'email_verified_at' => 'timestamp',
-        'phone_country_code' => 'string',
+        'phone_country' => 'string',
+        'phone_country_dial' => 'string',
         'phone' => 'string',
+        'avatar' => 'string',
         'address' => 'string',
         'city' => 'string',
         'state' => 'string',
@@ -151,5 +157,24 @@ class LiveStreamCompanyUsers extends Authenticatable
         return $token;
     }
 
-    // public function 
+    public function getAvatar()
+    {
+        $media = $this->hasOne(LiveStreamMedias::class, 'id', 'avatar')->first();
+
+        if ($media == null) {
+            return null;
+        }
+
+        return (object)[
+            "height" => $media->height,
+            "media_id" => $media->id,
+            "mime" => $media->mime,
+            "url" => match ($media->s3_available) {
+                null => API::getMediaUrl($media->id),
+                default => API::getMediaCdnUrl($media->path)
+            },
+            "width" => $media->width,
+
+        ];
+    }
 }
