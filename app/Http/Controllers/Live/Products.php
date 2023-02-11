@@ -432,7 +432,7 @@ class Products extends API
 
         try {
             $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 50;
+            $params['limit'] = $params['limit'] ?? 80;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
             $params['order'] = $params['order'] ?? 'asc';
             $params['group_attached'] = $params['group_attached'] ?? false;
@@ -531,7 +531,7 @@ class Products extends API
 
         try {
             $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 50;
+            $params['limit'] = $params['limit'] ?? 80;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
             $params['order'] = $params['order'] ?? 'asc';
             $has_token = isset($params['token']);
@@ -601,8 +601,8 @@ class Products extends API
         $r->data = $products;
 
         $r->data_info = [
-            'offset' => isset($params['offset']) ? $params['offset'] : 0,
-            'limit' => isset($params['limit']) ? $params['limit'] : 50,
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
             'count' => count($products),
             'total' => $products_total,
         ];
@@ -629,23 +629,56 @@ class Products extends API
 
         try {
             $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 50;
+            $params['limit'] = $params['limit'] ?? 80;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
             $params['order'] = $params['order'] ?? 'asc';
+            $has_token = isset($params['token']);
+            
 
-            $products = Cache::remember('products_by_story_' . $story_id, now()->addSeconds(3), function () use ($story_id, $params) {
-                $products = new mLiveStreamProducts();
-                $products = $products->getProductsByStoryID($story_id)
-                    ->offset($params['offset'])
-                    ->limit($params['limit'])
-                    ->orderBy($params['order_by'], $params['order'])
-                    ->get()->map(function ($product) {
-                        $product->images = $product->getImages();
+            $products = match ($has_token) {
+                true => Cache::remember('products_by_story_' . $story_id . '_with_token', now()->addSeconds(3), function () use ($story_id, $params) {
+                    $products = new mLiveStreamProducts();
+                    $products = $products->getProductsByStoryID($story_id)
+                        ->offset($params['offset'])
+                        ->limit($params['limit'])
+                        ->orderBy($params['order_by'], $params['order'])
+                        ->get();
+                    return $products->map(function ($product) {
+                        $product->images = $product->getImagesDetails();
                         $product->link = API::getLinkUrl($product->link_id);
+
+                        $group = $product->getGroup();
+                        $group->makeHidden(['promoted']);
+
+                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
+
+                        $product->group = $group;
+                        $product->makeVisible(['created_at']);
                         return $product;
                     });
-                return $products;
-            });
+                }),
+                default => Cache::remember('products_by_story_' . $story_id, now()->addSeconds(3), function () use ($story_id, $params) {
+                    $products = new mLiveStreamProducts();
+                    $products = $products->getProductsByStoryID($story_id)
+                        ->offset($params['offset'])
+                        ->limit($params['limit'])
+                        ->orderBy($params['order_by'], $params['order'])
+                        ->get();
+                    return $products->map(function ($product) {
+                        $product->images = $product->getImages();
+                        $product->link = API::getLinkUrl($product->link_id);
+
+                        $group = $product->getGroup();
+                        $group->makeHidden(['promoted']);
+
+                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
+
+                        $product->group = $group;
+                        $product->makeHidden(['status', 'group_id']);
+                        return $product;
+                    });
+                })
+            };
 
             $products_total = Cache::remember('products_by_story_total_', now()->addSeconds(3), function () use ($story_id) {
                 $products = new mLiveStreamProducts();
@@ -667,8 +700,8 @@ class Products extends API
         $r->data = $products;
 
         $r->data_info = [
-            'offset' => isset($params['offset']) ? $params['offset'] : 0,
-            'limit' => isset($params['limit']) ? $params['limit'] : 50,
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
             'count' => count($products),
             'total' => $products_total,
         ];
