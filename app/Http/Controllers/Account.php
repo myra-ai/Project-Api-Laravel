@@ -136,7 +136,8 @@ class Account extends API
             $company_user->email = $params['email'];
             $company_user->name = $params['name'];
             $company_user->password = Hash::make($params['password']);
-            $company_user->phone_country_code = $params['phone_country'];
+            $company_user->phone_country = $params['phone_country'];
+            $company_user->phone_country_dial = $params['phone_country_dial'];
             $company_user->phone = $params['phone'];
             $company_user->is_master = true;
             $company_user->save();
@@ -434,6 +435,72 @@ class Account extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
+    public function doCreateUser(Request $request): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60'],
+            'email' => ['required', 'string', 'email', 'max:100'],
+            'name' => ['required', 'string', 'max:40'],
+            'password_confirmation' => ['required', 'string', 'min:4', 'max:100', 'same:password'],
+            'password' => ['required', 'string', 'min:4', 'max:100'],
+            'role' => ['nullable', 'numeric', 'in:1,0'],
+            'avatar' => ['nullable', 'uuid', 'size:36', 'exists:livestream_medias,id'],
+        ], $request->all())) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
+            return $company;
+        }
+
+        if (($company_user = API::getCompanyUserByEmail($params['email'], false, $r)) instanceof JsonResponse) {
+            return $company_user;
+        }
+
+        if ($company_user !== null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Email address already exists.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
+
+        try {
+            $company_user = new mLiveStreamCompanyUsers();
+            $company_user->id = Str::uuid()->toString();
+            $company_user->company_id = $company->id;
+            $company_user->email = $params['email'];
+            $company_user->password = Hash::make($params['password']);
+            $company_user->name = $params['name'];
+            $company_user->role = $params['role'] ?? 0;
+            $company_user->avatar = $params['avatar'] ?? null;
+            $company_user->save();
+            $company_user->refresh();
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to create user.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $token_expires_at = now()->addMinutes(config('session.lifetime'));
+
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('User has been created.'),
+        ];
+        $r->success = true;
+        $r->data = (object) [
+            'login_token' => $company_user->generateToken($token_expires_at)
+        ];
+        return response()->json($r, Response::HTTP_OK);
+    }
+
     public function getUsers(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
@@ -463,10 +530,12 @@ class Account extends API
 
         $r->success = true;
         $r->data = $company->users()
+            ->where('deleted_at', '=', null)
             ->offset($params['offset'])
             ->limit($params['limit'])
             ->orderBy($params['order_by'], $params['order'])
-            ->get()->map(function ($user) use (&$count) {
+            ->get()
+            ->map(function ($user) use (&$count) {
                 $user->makeVisible(['role', 'is_master', 'phone', 'phone_country', 'phone_country_dial', 'created_at', 'address', 'city', 'state', 'zip', 'country']);
                 $count++;
                 return (object) [
@@ -549,7 +618,7 @@ class Account extends API
         $params['address'] = $params['address'] ?? null;
         $params['zip'] = $params['zip'] ?? null;
         $params['password'] = $params['password'] ?? null;
-        $params['role'] = $params['role'] ?? null;
+        $params['role'] = intval($params['role']) ?? null;
 
         if ($params['email'] !== null && $params['email'] !== $company_user->email) {
             if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
@@ -560,6 +629,16 @@ class Account extends API
                 $r->messages[] = (object) [
                     'type' => 'error',
                     'message' => __('Email address is already in use.'),
+                ];
+                return response()->json($r, Response::HTTP_UNAUTHORIZED);
+            }
+        }
+
+        if ($params['role'] !== null && $params['role'] !== $company_user->role) {
+            if ($company_user->is_master) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Master user cannot change role.'),
                 ];
                 return response()->json($r, Response::HTTP_UNAUTHORIZED);
             }

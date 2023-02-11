@@ -100,6 +100,7 @@ Route::post('/account/logout/{token}', [C\Account::class, 'doLogout']);
 Route::post('/account/password/reset', [C\Account::class, 'doResetPassword']);
 Route::post('/account/password/reset/{token}', [C\Account::class, 'doResetPasswordVerify']);
 Route::post('/account/password/change', [C\Account::class, 'doChangePassword']);
+Route::post('/account/user', [C\Account::class, 'doCreateUser']);
 Route::get('/account/users', [C\Account::class, 'getUsers']);
 Route::put('/account/user/{user_id}', [C\Account::class, 'doUpdateUser']);
 Route::put('/account/user/{user_id}/password', [C\Account::class, 'doUpdateUserPassword']);

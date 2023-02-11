@@ -6,6 +6,7 @@ use App\Http\Controllers\API;
 use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
+use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class Products extends API
             'status' => ['nullable', 'integer', 'min:0', 'max:1'],
             'currency' => ['nullable', 'string', 'size:3', 'in:' . implode(',', API::$valid_currencies)],
             'description' => ['nullable', 'string', 'max:2000'],
+            'images' => ['nullable', 'string'],
             'images_url' => ['nullable', 'array', 'min:1', 'max:10'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
@@ -63,7 +65,76 @@ class Products extends API
                 $data['link_id'] = $link->id;
             }
 
-            mLiveStreamProducts::create($data);
+            $product = mLiveStreamProducts::create($data);
+
+            if (isset($params['images'])) {
+                $params['images'] = trim($params['images']);
+                $params['images'] = explode(';', $params['images']);
+                $params['images'] = array_map(function ($image) {
+                    return trim($image);
+                }, $params['images']);
+                $params['images'] = array_filter($params['images'], function ($image) {
+                    return !empty($image);
+                });
+
+                foreach ($params['images'] as $media_id) {
+                    if (!Uuid::isValid($media_id)) {
+                        $message = (object) [
+                            'type' => 'error',
+                            'message' => 'Invalid image id',
+                        ];
+                        if (config('app.debug')) {
+                            $message->debug = 'Image id is not a valid UUID';
+                        }
+                        $r->messages[] = $message;
+                        continue;
+                    }
+
+                    $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(30), function () use ($media_id) {
+                        return mLiveStreamMedias::where('id', '=', $media_id)->first();
+                    });
+
+                    if ($media === null) {
+                        $message = (object) [
+                            'type' => 'error',
+                            'message' => __('Media not found'),
+                        ];
+                        if (config('app.debug')) {
+                            $message->debug = 'Image not found in database';
+                        }
+                        $r->messages[] = $message;
+                        continue;
+                    }
+
+                    $image = new mLiveStreamProductsImages();
+                    $id = Uuid::uuid5(Uuid::NAMESPACE_DNS, $product_id . $media->id)->toString();
+
+                    if ($image->where('id', '=', $id)->exists()) {
+                        $message = (object) [
+                            'type' => 'warning',
+                            'message' => 'Product image already exists',
+                        ];
+                        $r->messages[] = $message;
+                        continue;
+                    }
+
+                    try {
+                        $image->id = $id;
+                        $image->product_id = $product_id;
+                        $image->media_id = $media->id;
+                        $image->save();
+                    } catch (\Exception $e) {
+                        $message = (object) [
+                            'type' => 'error',
+                            'message' => 'Failed to register product image',
+                        ];
+                        if (config('app.debug')) {
+                            $message->debug = $e->getMessage();
+                        }
+                        $r->messages[] = $message;
+                    }
+                }
+            }
 
             if (isset($params['images_url'])) {
                 $params['images_url'] = array_map(function ($image) {
@@ -137,6 +208,8 @@ class Products extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        $product->refresh();
+
         $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('Product created successfully.'),
@@ -144,6 +217,7 @@ class Products extends API
         $r->data = (object) [
             'id' => $product_id,
             'created' => now()->toISOString(),
+            'images' => $product->getImagesDetails(),
             'link' => (object)[
                 'id' => $link->id,
             ],

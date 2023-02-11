@@ -325,10 +325,10 @@
                     <table class="es-header" cellspacing="0" cellpadding="0" align="center"
                         style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%;background-color:#f71963;background-repeat:repeat;background-position:center top">
                         <tr style="border-collapse:collapse">
-                            <td style="padding:0;Margin:0;background-color:#f71963" bgcolor="#f71963" align="center">
+                            <td style="padding:0;Margin:0;background-color:#000000" bgcolor="#000000" align="center">
                                 <table class="es-header-body" cellspacing="0" cellpadding="0" align="center"
-                                    bgcolor="#f71963"
-                                    style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#f71963;width:600px">
+                                    bgcolor="#000000"
+                                    style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:#000000;width:600px">
                                     <tr style="border-collapse:collapse">
                                         <td align="left"
                                             style="Margin:0;padding-bottom:10px;padding-left:10px;padding-right:10px;padding-top:20px">
@@ -343,10 +343,57 @@
                                                             <tr style="border-collapse:collapse">
                                                                 <td align="center"
                                                                     style="Margin:0;padding-left:10px;padding-right:10px;padding-top:25px;padding-bottom:25px;font-size:0px">
-                                                                    <img src="https://mchykn.stripocdn.email/content/guids/CABINET_4dbaa663f5f0548adcde49c635aaca0519da7ab60c675648180e189290b66404/images/bliver.png"
-                                                                        alt="Bliver"
-                                                                        style="display:block;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;font-size:12px"
-                                                                        width="128" title="Bliver">
+                                                                    <svg version="1.1" id="Camada_1"
+                                                                        xmlns="http://www.w3.org/2000/svg"
+                                                                        xmlns:xlink="http://www.w3.org/1999/xlink"
+                                                                        x="0px" y="0px" width="256px"
+                                                                        viewBox="0 0 1869.62 551.89"
+                                                                        style="enable-background:new 0 0 1869.62 551.89;"
+                                                                        xml:space="preserve">
+                                                                        <style type="text/css">
+                                                                            .st0 {
+                                                                                fill: #FFFFFF;
+                                                                            }
+
+                                                                            .st1 {
+                                                                                fill: #F71963;
+                                                                            }
+                                                                        </style>
+                                                                        <g>
+                                                                            <path class="st0"
+                                                                                d="M7.95,69.25H163.7v155.8c25.86-31.04,49.96-43.45,85.22-43.45c70.53,0,114.61,60.83,114.61,157.66
+                                                                       c0,100.56-41.14,153.94-118.14,153.94c-38.79,0-59.36-10.55-95.8-50.28l-25.86,40.35H49.09V152.42c0-24.21-5.88-29.17-35.85-29.17
+                                                                       H7.95V69.25z M163.7,333.05c0,67.04,12.34,98.07,38.2,98.07s38.2-30.42,38.2-93.11c0-62.07-12.34-91.87-38.2-91.87
+                                                                       C176.63,246.15,163.7,274.7,163.7,333.05z" />
+                                                                            <path class="st0"
+                                                                                d="M545.73,400.09c0.59,24.21,4.11,28.55,27.04,29.17h9.4v54h-191.6v-54h12.93c23.51-0.62,27.04-4.97,27.62-29.17
+                                                                       V152.42c-0.59-24.21-4.11-28.55-27.62-29.17h-12.93v-54h155.16V400.09z" />
+                                                                            <path class="st0"
+                                                                                d="M794.93,483.26H603.91v-54h11.75c23.51-0.62,27.04-4.97,27.62-29.17V275.32
+                                                                       c-0.59-24.21-4.11-28.55-27.62-29.17h-11.75v-54H757.9v207.94c0.59,24.21,4.11,28.55,27.04,29.17h9.99V483.26z M744.97,112.7
+                                                                       c0,31.04-23.51,55.86-52.9,55.86c-29.39,0-52.31-24.21-52.31-56.48c0-29.79,23.51-54.62,52.31-54.62
+                                                                       C721.46,57.45,744.97,82.28,744.97,112.7z" />
+                                                                            <path class="st0"
+                                                                                d="M998.29,192.15h134.59v54c-25.86,0.62-37.62,8.69-44.67,32.9l-66.41,204.21H894.85l-62.3-207.94
+                                                                       c-8.23-24.83-11.75-29.17-27.04-29.17h-10.58v-54h179.85v54c-25.27,0-31.15,3.1-31.15,15.52c0,3.72,0.59,8.69,2.35,13.66
+                                                                       l39.97,130.97l41.14-130.97c0.59-3.72,1.18-6.21,1.18-10.55c0-11.79-7.64-16.76-29.97-18.62V192.15z" />
+                                                                            <path class="st0"
+                                                                                d="M1440.86,382.08c-9.4,39.73-18.81,60.21-37.03,77.59c-23.51,21.72-62.89,34.76-108.14,34.76
+                                                                       c-97.56,0-157.51-59.59-157.51-157.04c0-94.97,61.12-156.42,155.75-156.42c55.83,0,98.74,21.72,122.84,62.69
+                                                                       c17.04,28.55,22.33,54,22.92,111.11H1256.9c0.59,31.66,2.94,45.31,10.58,58.35c9.4,14.9,27.04,24.21,45.26,24.21
+                                                                       c17.63,0,34.09-8.07,44.08-22.35c5.29-7.45,8.82-16.76,12.34-32.9H1440.86z M1340.94,300.77c-0.59-24.21-2.35-35.38-8.82-45.93
+                                                                       c-6.47-11.79-18.81-18.62-32.33-18.62c-14.11,0-27.62,8.07-34.09,19.86c-5.29,9.31-7.64,19.86-8.82,44.69H1340.94z" />
+                                                                            <path class="st0"
+                                                                                d="M1620.71,220.7c24.1-28.55,42.9-38.48,70.53-38.48c41.73,0,69.35,28.55,69.35,70.76
+                                                                       c0,37.24-21.75,62.07-54.07,62.07c-25.86,0-45.84-19.24-45.84-45.31c0-17.38,7.64-29.17,25.86-40.35
+                                                                       c-5.29-1.24-9.99-1.86-12.93-1.86c-13.52,0-28.8,10.55-37.62,24.83c-8.82,15.52-12.93,34.14-12.93,62.07v85.66
+                                                                       c0.59,24.21,4.11,28.55,27.62,29.17h18.81v54h-198.66v-54h10.58c22.92-0.62,26.45-4.97,27.04-29.17V275.32
+                                                                       c-0.59-24.21-4.11-28.55-27.04-29.17h-10.58v-54h149.87V220.7z" />
+                                                                            <path class="st1"
+                                                                                d="M1861.67,436.71c0,31.66-23.51,57.11-53.48,57.11c-30.56,0-54.07-25.45-54.07-58.35
+                                                                       c0-29.79,24.68-55.24,54.07-55.24C1837.58,380.22,1861.67,405.67,1861.67,436.71z" />
+                                                                        </g>
+                                                                    </svg>
                                                                 </td>
                                                             </tr>
                                                         </table>
@@ -362,7 +409,7 @@
                     <table class="es-content" cellspacing="0" cellpadding="0" align="center"
                         style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;table-layout:fixed !important;width:100%">
                         <tr style="border-collapse:collapse">
-                            <td style="padding:0;Margin:0;background-color:#f71963" bgcolor="#f71963" align="center">
+                            <td style="padding:0;Margin:0;background-color:#000000" bgcolor="#000000" align="center">
                                 <table class="es-content-body"
                                     style="mso-table-lspace:0pt;mso-table-rspace:0pt;border-collapse:collapse;border-spacing:0px;background-color:transparent;width:600px"
                                     cellspacing="0" cellpadding="0" align="center">
@@ -587,7 +634,7 @@
                                                                         style="Margin:0;-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;font-family:lato, 'helvetica neue', helvetica, arial, sans-serif;line-height:21px;color:#666666;font-size:14px">
                                                                         You received this email because you have a
                                                                         <strong><a class="view" target="_blank"
-                                                                                href="{{ url(env('DASH_URL').'/sign-in') }}"
+                                                                                href="{{ url(env('DASH_URL') . '/sign-in') }}"
                                                                                 style="-webkit-text-size-adjust:none;-ms-text-size-adjust:none;mso-line-height-rule:exactly;text-decoration:underline;color:#111111;font-size:14px">bliver</a></strong>
                                                                         account, isn't that right? contact us
                                                                     </p>

@@ -1055,7 +1055,7 @@ class API extends Controller
         $media = null;
 
         try {
-            $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(self::CACHE_TIME), function () use ($media_id) {
+            $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(30), function () use ($media_id) {
                 return mLiveStreamMedias::where('id', '=', $media_id)->first();
             });
         } catch (\Exception $e) {
