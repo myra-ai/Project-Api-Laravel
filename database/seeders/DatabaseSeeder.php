@@ -50,17 +50,17 @@ class DatabaseSeeder extends Seeder
             'id' => $tenant_id,
         ]);
 
-        $avatar = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/347-3474759_icon-square-big-example-handle-with-care-symbol.png', alt: 'Avatar', desc: 'Default avatar');
-        $logo = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Logo', desc: 'Default logo');
+        $avatar = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Avatar', desc: 'Default avatar');
+        $logo = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Logo', desc: 'Default logo');
 
         mLiveStreamCompanies::create([
             'id' => $company_id,
             'tenant_id' => $tenant_id,
             'name' => 'Bliver',
-            'primary_color' => '000000',
-            'cta_color' => '000000',
-            'accent_colors' => '000000',
-            'text_chat_color' => '000000',
+            'primary_color' => 'f71963',
+            'cta_color' => 'FF9149',
+            'accent_color' => '000000',
+            'text_chat_color' => 'F7F7F7',
             'rtmp_key' => null,
             'avatar' => $avatar->id,
             'logo' => $logo->id,
@@ -111,7 +111,7 @@ class DatabaseSeeder extends Seeder
         $story_id3 = '51841316-8b7c-402d-961d-cd00c7018338'; // Str::uuid()->toString();
 
         $media_story = API::registerMediaFromUrl('https://cdn.eibly.com/video/01d247ad-f847-4b95-84a0-54cf271de966-mixkit-man-under-multicolored-lights-1237-medium.mp4');
-    
+
         mStories::create([
             'id' => $story_id,
             'company_id' => $company_id,
@@ -253,7 +253,7 @@ class DatabaseSeeder extends Seeder
             'product_id' => $product_id[0],
             'stream_id' => $stream_id,
         ]);
-        
+
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[1],
@@ -271,7 +271,7 @@ class DatabaseSeeder extends Seeder
             'product_id' => $product_id[0],
             'story_id' => $story_id,
         ]);
-        
+
         mLiveStreamProductGroups::create([
             'id' => Str::uuid()->toString(),
             'product_id' => $product_id[1],

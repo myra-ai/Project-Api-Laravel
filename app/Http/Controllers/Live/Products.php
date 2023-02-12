@@ -522,6 +522,7 @@ class Products extends API
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
+            'group_attached' => ['nullable', new strBoolean],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -534,6 +535,7 @@ class Products extends API
             $params['limit'] = $params['limit'] ?? 80;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
             $params['order'] = $params['order'] ?? 'asc';
+            $params['group_attached'] = $params['group_attached'] ?? false;
             $has_token = isset($params['token']);
 
             $products = match ($has_token) {
@@ -620,6 +622,7 @@ class Products extends API
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
+            'group_attached' => ['nullable', new strBoolean],
         ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -632,8 +635,8 @@ class Products extends API
             $params['limit'] = $params['limit'] ?? 80;
             $params['order_by'] = $params['order_by'] ?? 'created_at';
             $params['order'] = $params['order'] ?? 'asc';
+            $params['group_attached'] = $params['group_attached'] ?? false;
             $has_token = isset($params['token']);
-            
 
             $products = match ($has_token) {
                 true => Cache::remember('products_by_story_' . $story_id . '_with_token', now()->addSeconds(3), function () use ($story_id, $params) {

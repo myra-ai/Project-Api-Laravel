@@ -284,10 +284,12 @@ class Account extends API
         $r->success = true;
         $r->data = (object) [
             'id' => $company->id,
+            'avatar' => $company->getAvatar(),
+            'created_at' => $company_user->created_at,
+            'email' => $company_user->email,
+            'logo' => $company->getLogo(),
             'name' => $company->name,
             'role' => $company_user->role,
-            'avatar' => $company->getAvatar(),
-            'logo' => $company->getLogo(),
         ];
         return response()->json($r, Response::HTTP_OK);
     }

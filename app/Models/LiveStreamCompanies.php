@@ -30,7 +30,6 @@ class LiveStreamCompanies extends Authenticatable
         'state',
         'zip',
         'country',
-        'deleted_at',
         'primary_color',
         'cta_color',
         'accent_color',
@@ -38,17 +37,18 @@ class LiveStreamCompanies extends Authenticatable
         'rtmp_key',
         'avatar',
         'logo',
+        'font',
         'stories_is_embedded',
         'livestream_autoopen',
+        'deleted_at',
         'created_at',
         'updated_at',
     ];
 
     protected $hidden = [
         'id',
-        'tenant_id',
-        'deleted_at',
         'rtmp_key',
+        'deleted_at',
         'created_at',
         'updated_at',
     ];
@@ -67,7 +67,6 @@ class LiveStreamCompanies extends Authenticatable
         'state' => 'string',
         'zip' => 'string',
         'country' => 'string',
-        'deleted_at' => 'timestamp',
         'primary_color' => 'string',
         'cta_color' => 'string',
         'accent_color' => 'string',
@@ -75,8 +74,10 @@ class LiveStreamCompanies extends Authenticatable
         'rtmp_key' => 'string',
         'avatar' => 'string',
         'logo' => 'string',
+        'font' => 'integer',
         'stories_is_embedded' => 'boolean',
         'livestream_autoopen' => 'boolean',
+        'deleted_at' => 'timestamp',
         'created_at' => 'timestamp',
         'updated_at' => 'timestamp',
     ];
