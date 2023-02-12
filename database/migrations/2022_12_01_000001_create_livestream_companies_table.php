@@ -15,8 +15,6 @@ return new class extends Migration
     {
         Schema::create('livestream_companies', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->uuid('tenant_id')->index();
-            $table->foreign('tenant_id')->references('id')->on('tenants')->onDelete('cascade');
             $table->string('name', 100);
             $table->string('address', 255)->nullable()->default(null);
             $table->string('city', 80)->nullable()->default(null);

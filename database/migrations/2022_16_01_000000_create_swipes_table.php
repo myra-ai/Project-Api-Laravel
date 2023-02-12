@@ -13,8 +13,11 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('tenants', function (Blueprint $table) {
+        Schema::create('swipes', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->uuid('story_id')->nullable()->default(null)->index();
+            $table->foreign('story_id')->references('id')->on('stories')->onDelete('cascade');
+            $table->string('title', 255)->nullable()->default(null);
             $table->timestamps(6);
         });
     }
@@ -26,6 +29,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('tenants');
+        Schema::dropIfExists('swipes');
     }
 };

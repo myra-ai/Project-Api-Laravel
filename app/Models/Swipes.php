@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class StoriesSwipe extends Authenticatable
+class Swipes extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'stories_swipe';
+    protected $table = 'swipes';
     protected $primaryKey = 'id';
     public $timestamps = true;
 
@@ -21,9 +21,10 @@ class StoriesSwipe extends Authenticatable
      */
     protected $fillable = [
         'id',
-        'swipe_id',
         'story_id',
-        'name',
+        'title',
+        'created_at',
+        'updated_at',
     ];
 
     /**
@@ -33,8 +34,9 @@ class StoriesSwipe extends Authenticatable
      */
     protected $casts = [
         'id' => 'string',
-        'swipe_id' => 'integer',
         'story_id' => 'string',
-        'name' => 'string',
+        'title' => 'string',
+        'created_at' => 'timestamp',
+        'updated_at' => 'timestamp',
     ];
 }

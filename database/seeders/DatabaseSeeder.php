@@ -11,7 +11,6 @@ use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
 use App\Models\LiveStreams as mLiveStreams;
 use App\Models\Stories as mStories;
-use App\Models\Tenants as mTenants;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -46,16 +45,12 @@ class DatabaseSeeder extends Seeder
         $company_id = '1ad782fc-cc4b-4ba7-b91c-ec90d3464529'; // Str::uuid()->toString();
         $user_id = '19a329fa-0d45-43cf-b878-b428d0b33ad2'; // Str::uuid()->toString();
 
-        mTenants::create([
-            'id' => $tenant_id,
-        ]);
 
         $avatar = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Avatar', desc: 'Default avatar');
         $logo = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Logo', desc: 'Default logo');
 
         mLiveStreamCompanies::create([
             'id' => $company_id,
-            'tenant_id' => $tenant_id,
             'name' => 'Bliver',
             'primary_color' => 'f71963',
             'cta_color' => 'FF9149',

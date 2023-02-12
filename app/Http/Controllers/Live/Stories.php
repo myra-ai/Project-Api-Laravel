@@ -360,4 +360,34 @@ class Stories extends API
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
+
+    public function getSwipes(Request $request, ?string $company_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
+        ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        $r->data = API::story($story);
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function addStoryToSwipe(Request $request, ?string $story_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'story_id' => ['required', 'string', 'size:36', 'uuid'],
+        ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
+            return $story;
+        }
+
+        $r->data = API::story($story);
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
 }
