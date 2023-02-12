@@ -61,20 +61,18 @@ Route::post('/comment', [L\Comments::class, 'addComment']);
 Route::get('/comments', [L\Comments::class, 'getComments']);
 Route::get('/comments/count', [L\Comments::class, 'getCommentsCount']);
 
-Route::post('/product/stream', [L\Products::class, 'addStreamOrStoryProduct']);
-Route::post('/product/story', [L\Products::class, 'addStreamOrStoryProduct']);
+Route::post('/product/{product_id}/stream', [L\Products::class, 'addStreamOrStoryProduct']);
+Route::post('/product/{product_id}/story', [L\Products::class, 'addStreamOrStoryProduct']);
 Route::post('/product/{company_id}', [L\Products::class, 'doCreateProduct']);
 Route::post('/product/image/{media_id}', [L\Products::class, 'addImage']);
-Route::delete('/product/stream', [L\Products::class, 'removeStreamOrStoryProduct']);
-Route::delete('/product/story', [L\Products::class, 'removeStreamOrStoryProduct']);
+Route::delete('/product/{product_id}/stream', [L\Products::class, 'removeStreamOrStoryProduct']);
+Route::delete('/product/{product_id}/story', [L\Products::class, 'removeStreamOrStoryProduct']);
 Route::put('/product/promote/status/{group_ip}', [L\Products::class, 'updateProductPromoteStatus']);
 Route::get('/products/company/{company_id}', [L\Products::class, 'getByCompanyID']);
 Route::get('/products/stream/{company_id}', [L\Products::class, 'getByStreamID']);
 Route::get('/products/story/{company_id}', [L\Products::class, 'getByStoryID']);
-
 Route::get('/product/group/{group_id}', [L\Products::class, 'getGroupByID']);
 Route::delete('/product/group/{group_id}', [L\Products::class, 'doDeleteGroup']);
-
 Route::get('/product/{product_id}', [L\Products::class, 'getByProductID']);
 Route::put('/product/{product_id}', [L\Products::class, 'productUpdate']);
 Route::delete('/product/{product_id}', [L\Products::class, 'productDelete']);

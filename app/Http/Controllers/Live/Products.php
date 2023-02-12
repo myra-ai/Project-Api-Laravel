@@ -226,15 +226,15 @@ class Products extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function addStreamOrStoryProduct(Request $request): JsonResponse
+    public function addStreamOrStoryProduct(Request $request, ?string $product_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'get_product' => ['nullable', new strBoolean],
-        ], $request->all())) instanceof JsonResponse) {
+        ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
             return $params;
         }
 
@@ -252,7 +252,7 @@ class Products extends API
             }
             $group = new mLiveStreamProductGroups();
             $getGroup = $group->where('product_id', '=', $product->id)->where('stream_id', $stream->id)->first();
-        } else if ($params['story'] !== null) {
+        } else if ($params['story_id'] !== null) {
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
@@ -270,8 +270,16 @@ class Products extends API
         if ($getGroup !== null) {
             $message = (object) [
                 'type' => 'warning',
-                'message' => __('The product is already in the stream.'),
+                'message' => __('The product is already added.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = (object) [
+                    'product_id' => $product->id,
+                    'stream_id' => $params['stream_id'],
+                    'story_id' => $params['story_id'],
+                    'group' => $getGroup,
+                ];
+            }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_OK);
         }
@@ -279,12 +287,16 @@ class Products extends API
         $id = Str::uuid()->toString();
 
         $group->id = $id;
-        $group->stream_id = $stream->id;
+        if ($params['stream_id'] !== null) {
+            $group->stream_id = $stream->id;
+        } else if ($params['story_id'] !== null) {
+            $group->story_id = $story->id;
+        }
         $group->product_id = $product->id;
         if (!$group->save()) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Product could not be added to the stream.'),
+                'message' => __('Product could not be added.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -292,7 +304,7 @@ class Products extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => __('Product added to the stream successfully.'),
+            'message' => __('Product added successfully.'),
         ];
 
         if ($params['get_product'] === true) {
@@ -322,15 +334,15 @@ class Products extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function removeStreamOrStoryProduct(Request $request): JsonResponse
+    public function removeStreamOrStoryProduct(Request $request, ?string $product_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'get_product' => ['nullable', new strBoolean],
-        ], $request->all())) instanceof JsonResponse) {
+        ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
             return $params;
         }
 
@@ -347,7 +359,7 @@ class Products extends API
                 return $stream;
             }
             $group = mLiveStreamProductGroups::where('product_id', '=', $product->id)->where('stream_id', $stream->id);
-        } else if ($params['story'] !== null) {
+        } else if ($params['story_id'] !== null) {
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
@@ -364,7 +376,7 @@ class Products extends API
         if ($group->first() === null) {
             $message = (object) [
                 'type' => 'warning',
-                'message' => __('The product is not in the stream.'),
+                'message' => __('The product is not added.'),
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_OK);
@@ -373,7 +385,8 @@ class Products extends API
         if (!$group->delete()) {
             $message = (object) [
                 'type' => 'error',
-                'message' => __('Product could not be removed from the stream.'),
+                'message' => __('Product could not be removed.'),
+
             ];
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
@@ -381,7 +394,7 @@ class Products extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => __('Product removed from the stream successfully.'),
+            'message' => __('Product removed successfully.'),
         ];
 
         if ($params['get_product'] === true) {
