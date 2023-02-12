@@ -226,29 +226,46 @@ class Products extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function addStreamProduct(Request $request): JsonResponse
+    public function addStreamOrStoryProduct(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
+            'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
+            'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'get_product' => ['nullable', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
+        $params['stream_id'] = $params['stream_id'] ?? null;
+        $params['story_id'] = $params['story_id'] ?? null;
+        $params['get_product'] = $params['get_product'] ?? false;
 
         if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
             return $product;
         }
 
-        $params['get_product'] = $params['get_product'] ?? false;
-
-        $group = new mLiveStreamProductGroups();
-        $getGroup = $group->where('product_id', '=', $product->id)->where('stream_id', $stream->id)->first();
+        if ($params['stream_id'] !== null) {
+            if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
+                return $stream;
+            }
+            $group = new mLiveStreamProductGroups();
+            $getGroup = $group->where('product_id', '=', $product->id)->where('stream_id', $stream->id)->first();
+        } else if ($params['story'] !== null) {
+            if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
+                return $story;
+            }
+            $group = new mLiveStreamProductGroups();
+            $getGroup = $group->where('product_id', '=', $product->id)->where('story_id', $story->id)->first();
+        } else {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Stream or story id is required.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
 
         if ($getGroup !== null) {
             $message = (object) [
@@ -305,28 +322,44 @@ class Products extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function removeStreamProduct(Request $request): JsonResponse
+    public function removeStreamOrStoryProduct(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
+            'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
+            'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'get_product' => ['nullable', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
+        $params['stream_id'] = $params['stream_id'] ?? null;
+        $params['story_id'] = $params['story_id'] ?? null;
+        $params['get_product'] = $params['get_product'] ?? false;
 
         if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
             return $product;
         }
 
-        $params['get_product'] = $params['get_product'] ?? false;
-
-        $group = mLiveStreamProductGroups::where('product_id', '=', $product->id)->where('stream_id', $stream->id);
+        if ($params['stream_id'] !== null) {
+            if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
+                return $stream;
+            }
+            $group = mLiveStreamProductGroups::where('product_id', '=', $product->id)->where('stream_id', $stream->id);
+        } else if ($params['story'] !== null) {
+            if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
+                return $story;
+            }
+            $group = mLiveStreamProductGroups::where('product_id', '=', $product->id)->where('story_id', $story->id);
+        } else {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Stream or story id is required.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
 
         if ($group->first() === null) {
             $message = (object) [
@@ -483,7 +516,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_total', now()->addSeconds(3), function () use ($company_id) {
+            $products_total = Cache::remember('products_by_company_' . $company_id . '_total', now()->addSeconds(3), function () use ($company_id) {
                 return mLiveStreamProducts::where('company_id', '=', $company_id)
                     ->where('deleted_at', '=', null)
                     ->count();
@@ -583,7 +616,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_stream_total_', now()->addSeconds(3), function () use ($stream_id) {
+            $products_total = Cache::remember('products_by_stream_' . $stream_id . '_total_', now()->addSeconds(3), function () use ($stream_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStreamID($stream_id)->count();
                 return $products;
@@ -683,7 +716,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_story_total_', now()->addSeconds(3), function () use ($story_id) {
+            $products_total = Cache::remember('products_by_story_' . $story_id . '_total_', now()->addSeconds(3), function () use ($story_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStoryID($story_id)->count();
                 return $products;

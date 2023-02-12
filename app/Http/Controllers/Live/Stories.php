@@ -119,6 +119,11 @@ class Stories extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Story updated.'),
+        ];
+
         $r->data = (object) [
             'id' => $story->id,
             'title' => $story->title,
