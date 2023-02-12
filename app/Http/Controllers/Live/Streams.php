@@ -24,7 +24,7 @@ class Streams extends API
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'note' => ['nullable', 'string', 'min:8', 'max:1000'],
             'sheduled_at' => ['nullable', new Timestamp],
-            'audio_only' => ['nullable', 'boolean'],
+            'audio_only' => ['nullable', new strBoolean],
             'orientation' => ['nullable', 'string', 'in:landscape,portrait'],
             'latency_mode' => ['nullable', 'string', 'in:low,normal'],
             'max_duration' => ['nullable', 'integer', 'min:60', 'max:43200'],
@@ -285,7 +285,7 @@ class Streams extends API
                 default => throw new \Exception('Invalid token')
             };
 
-            $streams_count = (int) Cache::remember('streams_company_count_' . $params['company_id'], now()->addSeconds(3), function () use ($params) {
+            $streams_count = (int) Cache::remember('streams_company_count_' . $params['company_id'], now()->addSeconds(API::CACHE_TIME), function () use ($params) {
                 return mLiveStreams::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {

@@ -3,14 +3,16 @@
 namespace App\Http\Controllers\Live;
 
 use App\Http\Controllers\API;
-use App\Models\Stories as mStories;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
+use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
+use App\Models\Stories as mStories;
 use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class Stories extends API
 {
@@ -20,9 +22,16 @@ class Stories extends API
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
             'title' => ['required', 'string', 'min:4', 'max:100'],
             'media_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
+            'products' => ['nullable', 'string'],
+            'get_story' => ['nullable', new StrBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
+
+        $params['title'] = isset($params['title']) ? trim($params['title']) : null;
+        $params['media_id'] = isset($params['media_id']) ? trim($params['media_id']) : null;
+        $params['products'] = isset($params['products']) ? trim($params['products']) : null;
+        $params['get_story'] = isset($params['get_story']) ? filter_var($params['get_story'], FILTER_VALIDATE_BOOLEAN) : false;
 
         $story_id = Str::uuid()->toString();
 
@@ -34,17 +43,61 @@ class Stories extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        if (!isset($params['media_id'])) {
-            $params['media_id'] = null;
-        }
-
         try {
+            if ($params['media_id'] !== null) {
+                if (!mLiveStreamMedias::where('id', '=', $params['media_id'])->exists()) {
+                    $message = (object)[
+                        'type' => 'warning',
+                        'message' => __('Invalid media ID.'),
+                    ];
+                    $r->messages[] = $message;
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
+                }
+            }
+
             mStories::create([
                 'id' => $story_id,
                 'company_id' => $params['company_id'],
                 'title' => $params['title'],
                 'media_id' => $params['media_id'],
             ]);
+
+            if ($params['products'] !== null) {
+                $params['products'] = explode(';', $params['products']);
+                $params['products'] = array_map('trim', $params['products']);
+                $params['products'] = array_unique($params['products']);
+                $params['products'] = array_values($params['products']);
+                $params['products'] = array_filter($params['products'], function ($value) {
+                    if (empty($value) || is_null($value) || $value === '') {
+                        return false;
+                    }
+                    if (!Uuid::isValid($value)) {
+                        return false;
+                    }
+                    if (mLiveStreamMedias::where('id', '=', $value)->exists()) {
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (count($params['products']) === 0) {
+                    $message = (object)[
+                        'type' => 'warning',
+                        'message' => __('No valid products found.'),
+                    ];
+                    $r->messages[] = $message;
+                } else {
+                    foreach ($params['products'] as $product_id) {
+                        $group_id = Str::uuid()->toString();
+                        $group = [
+                            'id' => $group_id,
+                            'product_id' => $product_id,
+                            'story_id' => $story_id,
+                        ];
+                        mLiveStreamProductGroups::create($group);
+                    }
+                }
+            }
         } catch (\Exception $e) {
             $message = [
                 'type' => 'error',
@@ -59,9 +112,21 @@ class Stories extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $r->data = [
+        $r->messages[] = (object) [
+            'type' => 'success',
+            'message' => __('Story created successfully.'),
+        ];
+
+        $r->data = (object) [
             'id' => $story_id,
         ];
+
+        if ($params['get_story']) {
+            if (!($story = API::getStory($r, $story_id)) instanceof JsonResponse) {
+                $r->data = API::story($story);
+                $r->data->id = $story_id;
+            }
+        }
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
@@ -188,11 +253,11 @@ class Stories extends API
             return $params;
         }
 
-        $params['only_published'] = filter_var($params['only_published'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $params['offset'] = $params['offset'] ?? 0;
-        $params['limit'] = $params['limit'] ?? 50;
-        $params['order_by'] = $params['order_by'] ?? 'created_at';
-        $params['order'] = $params['order'] ?? 'asc';
+        $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+        $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 80;
+        $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
+        $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+        $params['only_published'] = isset($params['only_published']) ? filter_var($params['only_published'], FILTER_VALIDATE_BOOLEAN) : true;
 
         $stories_count = 0;
         $stories = [];
@@ -207,7 +272,7 @@ class Stories extends API
                 $params['order'],
             ]);
 
-            $stories = Cache::remember($cache_tag, now()->addSeconds(3), function () use ($params) {
+            $stories = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TIME), function () use ($params) {
                 return mStories::where('company_id', '=', $params['company_id'])
                     ->where('deleted_at', '=', null)
                     ->when($params['only_published'], function ($query) {
@@ -253,7 +318,7 @@ class Stories extends API
                     });
             });
 
-            $stories_count = Cache::remember($cache_tag . '_count', now()->addSeconds(3), function () use ($params) {
+            $stories_count = Cache::remember($cache_tag . '_count', now()->addSeconds(API::CACHE_TIME), function () use ($params) {
                 return mStories::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
@@ -291,45 +356,7 @@ class Stories extends API
             return $story;
         }
 
-        $source = $story->getSource();
-        $thumbnail = $story->getThumbnail();
-        if ($source !== null) {
-            $source = (object) [
-                'id' => $source->id,
-                'alt' => $source->alt,
-                'mime' => $source->mime,
-                'width' => $source->width,
-                'height' => $source->height,
-                'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
-            ];
-        }
-        if ($thumbnail !== null) {
-            $thumbnail = (object) [
-                'id' => $thumbnail->id,
-                'alt' => $thumbnail->alt,
-                'mime' => $thumbnail->mime,
-                'width' => $thumbnail->width,
-                'height' => $thumbnail->height,
-                'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
-            ];
-        }
-
-        $r->data = (object) [
-            'company_id' => $story->company_id,
-            'title' => $story->title,
-            'source' => $source,
-            'thumbnail' => $thumbnail,
-            'status' => $story->status,
-            'publish' => $story->publish,
-            'viewers' => $story->viewers,
-            'clicks' => $story->clicks,
-            'comments' => $story->comments,
-            'dislikes' => $story->dislikes,
-            'likes' => $story->likes,
-            'opens' => $story->opens,
-            'views' => $story->views,
-            'created_at' => $story->created_at,
-        ];
+        $r->data = API::story($story);
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

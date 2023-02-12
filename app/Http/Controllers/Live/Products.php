@@ -90,7 +90,7 @@ class Products extends API
                         continue;
                     }
 
-                    $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(30), function () use ($media_id) {
+                    $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(API::CACHE_TIME), function () use ($media_id) {
                         return mLiveStreamMedias::where('id', '=', $media_id)->first();
                     });
 
@@ -238,9 +238,9 @@ class Products extends API
             return $params;
         }
 
-        $params['stream_id'] = $params['stream_id'] ?? null;
-        $params['story_id'] = $params['story_id'] ?? null;
-        $params['get_product'] = $params['get_product'] ?? false;
+        $params['stream_id'] = isset($params['stream_id']) ? $params['stream_id'] : null;
+        $params['story_id'] = isset($params['story_id']) ? $params['story_id'] : null;
+        $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
 
         if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
             return $product;
@@ -346,9 +346,9 @@ class Products extends API
             return $params;
         }
 
-        $params['stream_id'] = $params['stream_id'] ?? null;
-        $params['story_id'] = $params['story_id'] ?? null;
-        $params['get_product'] = $params['get_product'] ?? false;
+        $params['stream_id'] = isset($params['stream_id']) ? $params['stream_id'] : null;
+        $params['story_id'] = isset($params['story_id']) ? $params['story_id'] : null;
+        $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
 
         if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
             return $product;
@@ -477,11 +477,11 @@ class Products extends API
         $products_total = 0;
 
         try {
-            $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 80;
-            $params['order_by'] = $params['order_by'] ?? 'created_at';
-            $params['order'] = $params['order'] ?? 'asc';
-            $params['group_attached'] = $params['group_attached'] ?? false;
+            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
+            $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
+            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
+            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+            $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
             $has_token = isset($params['token']);
 
             $products = match ($has_token) {
@@ -507,7 +507,7 @@ class Products extends API
                         return $product;
                     });
                 }),
-                default => Cache::remember('products_by_company_' . $company_id . '_without_token', now()->addSeconds(3), function () use ($company_id, $params) {
+                default => Cache::remember('products_by_company_' . $company_id . '_without_token', now()->addSeconds(API::CACHE_TIME), function () use ($company_id, $params) {
                     $products = mLiveStreamProducts::where('company_id', '=', $company_id)
                         ->where('status', '=', 1)
                         ->where('deleted_at', '=', null)->offset($params['offset'])
@@ -529,7 +529,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_company_' . $company_id . '_total', now()->addSeconds(3), function () use ($company_id) {
+            $products_total = Cache::remember('products_by_company_' . $company_id . '_total', now()->addSeconds(API::CACHE_TIME), function () use ($company_id) {
                 return mLiveStreamProducts::where('company_id', '=', $company_id)
                     ->where('deleted_at', '=', null)
                     ->count();
@@ -577,15 +577,15 @@ class Products extends API
         $products_total = 0;
 
         try {
-            $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 80;
-            $params['order_by'] = $params['order_by'] ?? 'created_at';
-            $params['order'] = $params['order'] ?? 'asc';
-            $params['group_attached'] = $params['group_attached'] ?? false;
+            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
+            $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
+            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
+            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+            $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
             $has_token = isset($params['token']);
 
             $products = match ($has_token) {
-                true => Cache::remember('products_by_stream_' . $stream_id . '_with_token', now()->addSeconds(3), function () use ($stream_id, $params) {
+                true => Cache::remember('products_by_stream_' . $stream_id . '_with_token', now()->addSeconds(API::CACHE_TIME), function () use ($stream_id, $params) {
                     $products = new mLiveStreamProducts();
                     $products = $products->getProductsByStreamID($stream_id)
                         ->offset($params['offset'])
@@ -606,7 +606,7 @@ class Products extends API
                         return $product;
                     });
                 }),
-                default => Cache::remember('products_by_stream_' . $stream_id, now()->addSeconds(3), function () use ($stream_id, $params) {
+                default => Cache::remember('products_by_stream_' . $stream_id, now()->addSeconds(API::CACHE_TIME), function () use ($stream_id, $params) {
                     $products = new mLiveStreamProducts();
                     $products = $products->getProductsByStreamID($stream_id)
                         ->offset($params['offset'])
@@ -629,7 +629,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_stream_' . $stream_id . '_total_', now()->addSeconds(3), function () use ($stream_id) {
+            $products_total = Cache::remember('products_by_stream_' . $stream_id . '_total_', now()->addSeconds(API::CACHE_TIME), function () use ($stream_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStreamID($stream_id)->count();
                 return $products;
@@ -677,15 +677,15 @@ class Products extends API
         $products_total = 0;
 
         try {
-            $params['offset'] = $params['offset'] ?? 0;
-            $params['limit'] = $params['limit'] ?? 80;
-            $params['order_by'] = $params['order_by'] ?? 'created_at';
-            $params['order'] = $params['order'] ?? 'asc';
-            $params['group_attached'] = $params['group_attached'] ?? false;
+            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
+            $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
+            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
+            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+            $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
             $has_token = isset($params['token']);
 
             $products = match ($has_token) {
-                true => Cache::remember('products_by_story_' . $story_id . '_with_token', now()->addSeconds(3), function () use ($story_id, $params) {
+                true => Cache::remember('products_by_story_' . $story_id . '_with_token', now()->addSeconds(API::CACHE_TIME), function () use ($story_id, $params) {
                     $products = new mLiveStreamProducts();
                     $products = $products->getProductsByStoryID($story_id)
                         ->offset($params['offset'])
@@ -706,7 +706,7 @@ class Products extends API
                         return $product;
                     });
                 }),
-                default => Cache::remember('products_by_story_' . $story_id, now()->addSeconds(3), function () use ($story_id, $params) {
+                default => Cache::remember('products_by_story_' . $story_id, now()->addSeconds(API::CACHE_TIME), function () use ($story_id, $params) {
                     $products = new mLiveStreamProducts();
                     $products = $products->getProductsByStoryID($story_id)
                         ->offset($params['offset'])
@@ -729,7 +729,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_story_' . $story_id . '_total_', now()->addSeconds(3), function () use ($story_id) {
+            $products_total = Cache::remember('products_by_story_' . $story_id . '_total_', now()->addSeconds(API::CACHE_TIME), function () use ($story_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStoryID($story_id)->count();
                 return $products;

@@ -367,6 +367,49 @@ class API extends Controller
         return $story;
     }
 
+    public static function story(object $story): object
+    {
+        $source = $story->getSource();
+        $thumbnail = $story->getThumbnail();
+        if ($source !== null) {
+            $source = (object) [
+                'id' => $source->id,
+                'alt' => $source->alt,
+                'mime' => $source->mime,
+                'width' => $source->width,
+                'height' => $source->height,
+                'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
+            ];
+        }
+        if ($thumbnail !== null) {
+            $thumbnail = (object) [
+                'id' => $thumbnail->id,
+                'alt' => $thumbnail->alt,
+                'mime' => $thumbnail->mime,
+                'width' => $thumbnail->width,
+                'height' => $thumbnail->height,
+                'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
+            ];
+        }
+
+        return (object) [
+            'company_id' => $story->company_id,
+            'title' => $story->title,
+            'source' => $source,
+            'thumbnail' => $thumbnail,
+            'status' => $story->status,
+            'publish' => $story->publish,
+            'viewers' => $story->viewers,
+            'clicks' => $story->clicks,
+            'comments' => $story->comments,
+            'dislikes' => $story->dislikes,
+            'likes' => $story->likes,
+            'opens' => $story->opens,
+            'views' => $story->views,
+            'created_at' => $story->created_at,
+        ];
+    }
+
     /**
      * Get live stream data from local database
      * 

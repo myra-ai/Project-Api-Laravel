@@ -180,7 +180,7 @@ class Comments extends API
             });
 
             if ($params['separe_pinned']) {
-                $pinned = Cache::remember($cache_tag . '_pinned', now()->addSeconds(3), function () use ($stream, $story, $params) {
+                $pinned = Cache::remember($cache_tag . '_pinned', now()->addSeconds(API::CACHE_TIME), function () use ($stream, $story, $params) {
                     $qry = mLiveStreamComments::select([
                         'text',
                         'name',
