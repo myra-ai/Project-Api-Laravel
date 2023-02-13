@@ -17,7 +17,7 @@ return new class extends Migration
             $table->id();
             $table->uuid('stream_id')->index();
             $table->foreign('stream_id')->references('id')->on('livestreams')->onDelete('cascade');
-            $table->timestamp('created_at', 6)->useCurrent();
+            $table->timestamp('created_at', 6)->useCurrent()->index();
             $table->string('ip', 128)->nullable()->default(null)->index();
             $table->string('region', 80)->nullable()->default(null)->index();
             $table->string('state', 60)->nullable()->default(null)->index();
@@ -26,15 +26,15 @@ return new class extends Migration
             $table->string('device', 80)->nullable()->default(null)->index();
             $table->string('os', 60)->nullable()->default(null)->index();
             $table->string('browser', 128)->nullable()->default(null)->index();
-            $table->tinyInteger('load')->unsigned()->default(0)->index();
-            $table->tinyInteger('click')->unsigned()->default(0)->index();
-            $table->tinyInteger('like')->unsigned()->default(0)->index();
-            $table->tinyInteger('unlike')->unsigned()->default(0)->index();
-            $table->tinyInteger('dislike')->unsigned()->default(0)->index();
-            $table->tinyInteger('undislike')->unsigned()->default(0)->index();
-            $table->tinyInteger('view')->unsigned()->default(0)->index();
-            $table->tinyInteger('share')->unsigned()->default(0)->index();
-            $table->tinyInteger('comment')->unsigned()->default(0)->index();
+            $table->integer('load')->default(0)->index();
+            $table->integer('click')->default(0)->index();
+            $table->integer('like')->default(0)->index();
+            $table->integer('unlike')->default(0)->index();
+            $table->integer('dislike')->default(0)->index();
+            $table->integer('undislike')->default(0)->index();
+            $table->integer('view')->default(0)->index();
+            $table->integer('share')->default(0)->index();
+            $table->integer('comment')->default(0)->index();
         });
     }
 

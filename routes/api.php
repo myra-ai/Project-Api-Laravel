@@ -116,6 +116,9 @@ Route::get('/metrics/accessed/most/country', [L\Metrics::class, 'getMostAccessed
 Route::get('/metrics/accessed/most/referer', [L\Metrics::class, 'getMostAccessedReferer']);
 Route::get('/metrics/acceses/total/days', [L\Metrics::class, 'getTotalAccessByDays']);
 Route::get('/metrics/acceses/average/days', [L\Metrics::class, 'getAverageAccessByDays']);
+Route::get('/metrics/top/streams', [L\Metrics::class, 'getTopStreams']);
+Route::get('/metrics/top/stories', [L\Metrics::class, 'getTopStories']);
+Route::get('/metrics/story/{story_id}', [L\Metrics::class, 'getStoryMetric']);
 
 Route::get('/healthcheck', function () {
     return response()->json([

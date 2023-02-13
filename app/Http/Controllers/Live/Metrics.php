@@ -9,6 +9,7 @@ use App\Models\SwipeMetrics as mSwipeMetrics;
 use App\Models\WebLogs as mWebLogs;
 use App\Rules\strBoolean;
 use App\Rules\Timestamp;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -353,9 +354,12 @@ class Metrics extends API
     public function getTopStreams(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'start' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'end' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'order_by' => ['nullable', 'string', 'in:ip,region,state,country,device,os,browser,load,click,like,unlike,dislike,undislike,view,share,comment'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'start' => ['nullable', 'integer', 'min:0', 'max:90'],
+            'end' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
@@ -363,17 +367,136 @@ class Metrics extends API
 
         $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.000000');
         $params['end'] = now()->subDays($params['end'] ?? 7)->format('Y-m-d H:i:s.000000');
-        $params['order_by'] = $params['order_by'] ?? 'view';
-        $params['order'] = $params['order'] ?? 'desc';
+        $params['limit'] = isset($params['limit']) ? intval($params['order']) : 30;
+        $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+        $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
+        $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
 
-        // group mLivestrems by stream_id and sum views
-        $data = mLiveStreamMetrics::select('stream_id', DB::raw('SUM(' . $params['order_by'] . ') as ' . $params['order_by']))
-            ->whereBetween('created_at', [$params['start'], $params['end']])
+        $data = mLiveStreamMetrics::select('stream_id', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
+            // $data = mLiveStreamMetrics::selectRaw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum')
+            // ->whereBetween('created_at', [$params['start'], $params['end']])
             ->groupBy('stream_id')
-            ->orderBy($params['order_by'], $params['order'])
+            ->orderBy($params['order_by'] . '_sum', $params['order'])
+            ->offset($params['offset'])
+            ->limit($params['limit'])
             ->get();
 
         $r->data = $data;
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function getTopStories(Request $request): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'start' => ['nullable', 'integer', 'min:0', 'max:90'],
+            'end' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
+            'order' => ['nullable', 'string', 'in:asc,desc'],
+        ], $request->all())) instanceof JsonResponse) {
+            return $params;
+        }
+
+        $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.u');
+        $params['end'] = now()->subDays($params['end'] ?? 30)->format('Y-m-d H:i:s.u');
+        $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 30;
+        $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+        $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
+        $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
+
+        $cache_tag = 'metrics_top_stories_';
+        $cache_tag .= sha1(implode('_', $params));
+
+        $metrics = [];
+
+        try {
+            $metrics = Cache::remember($cache_tag, now()->addSeconds(API::METRICS_CACHE_TIME), function () use ($params) {
+                return mStoryMetrics::select('story_id', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
+                    // ->whereBetween('created_at', [$params['start'], $params['end']])
+                    ->groupBy('story_id')
+                    ->orderBy($params['order_by'] . '_sum', $params['order'])
+                    ->offset($params['offset'])
+                    ->limit($params['limit'])->get()->map(function ($item) use ($params) {
+                        $item->{$params['order_by'] . '_sum'} = intval($item->{$params['order_by'] . '_sum'});
+                        return $item;
+                    });
+            });
+        } catch (\Exception $e) {
+            $message = (object)[
+                'type' => 'error',
+                'message' => 'Error while getting story metrics',
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->data = $metrics;
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function getStoryMetric(Request $request, ?string $story_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'range' => ['nullable', 'integer', 'min:10', 'max:86400'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
+            'order' => ['nullable', 'string', 'in:asc,desc'],
+            'story_id' => ['required', 'string', 'size:36', 'uuid', 'exists:stories,id'],
+        ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 30;
+        $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+        $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
+        $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
+        $params['range'] = isset($params['range']) ? intval($params['range']) : 30;
+
+        $cache_tag = 'metrics_story_' . $params['story_id'] . '_';
+        $cache_tag .= sha1(implode('_', $params));
+
+        $metrics = [];
+
+        try {
+            $metrics = Cache::remember($cache_tag, now()->addSeconds(API::METRICS_CACHE_TIME), function () use ($params, &$r) {
+                return mStoryMetrics::select('created_at', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
+                    ->where('story_id', $params['story_id'])
+                    ->groupBy(DB::raw('UNIX_TIMESTAMP(`created_at`) DIV ' . $params['range']))
+                    ->orderBy('created_at', $params['order'])
+                    ->offset($params['offset'])
+                    ->limit($params['limit'])
+                    ->get()
+                    ->map(function ($item) use ($params) {
+                        $item->makeHidden(['created_at']);
+                        $item->date = Carbon::parse($item->created_at)->format('Y-m-d H:i:s');
+                        $item->{$params['order_by'] . 's'} = intval($item->{$params['order_by'] . '_sum'});
+                        unset($item->{$params['order_by'] . '_sum'});
+                        return $item;
+                    });
+            });
+        } catch (\Exception $e) {
+            $message = (object)[
+                'type' => 'error',
+                'message' => 'Error while getting story metrics',
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->data = $metrics;
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

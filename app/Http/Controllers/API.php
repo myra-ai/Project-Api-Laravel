@@ -46,7 +46,7 @@ class API extends Controller
     const CACHE_TIME = 3;
     const COMMENTS_CACHE_TIME = 1;
     const LIVESTREAM_CACHE_TIME = 3;
-    const METRICS_CACHE_TIME = 300;
+    const METRICS_CACHE_TIME = 30;
     const PRODUCTS_CACHE_TIME = 3;
     const STORY_CACHE_TIME = 3;
 
@@ -1682,7 +1682,7 @@ class API extends Controller
         }
 
         $metric = [
-            'stream_id' => $params['stream_id'],
+            'story_id' => $params['story_id'],
             'created_at' => now()->format('Y-m-d H:i:s.u'),
             'ip' => $request->ip(),
             'region' => $region,

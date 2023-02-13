@@ -15,6 +15,7 @@ class Comments extends API
     public function addComment(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'text' => ['required', 'string', 'min:4', 'max:600'],
@@ -33,6 +34,7 @@ class Comments extends API
         $params['email'] = isset($params['email']) ? trim($params['email']) : null;
         $params['pinned'] = isset($params['pinned']) ? filter_var($params['pinned'], FILTER_VALIDATE_BOOLEAN) : false;
         $params['is_streammer'] = isset($params['is_streammer']) ? filter_var($params['is_streammer'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
 
         if (isset($params['stream_id'])) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
@@ -46,6 +48,14 @@ class Comments extends API
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($params['is_streammer'] === false && $params['token'] === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('Token is required.'),
             ];
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
