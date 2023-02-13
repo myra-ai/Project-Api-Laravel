@@ -284,6 +284,34 @@ class API extends Controller
         return substr(str_shuffle(str_repeat($pool, 4)), 0, $length);
     }
 
+    public static function getPrefRange(string $range): array
+    {
+        $pref_range = (object) [
+            'today' => [
+                'start' => now()->startOfDay()->format('Y-m-d H:i:s.u'),
+                'end' => now()->endOfDay()->format('Y-m-d H:i:s.u'),
+            ],
+            'yesterday' => [
+                'start' => now()->subDays(1)->startOfDay()->format('Y-m-d H:i:s.u'),
+                'end' => now()->subDays(1)->endOfDay()->format('Y-m-d H:i:s.u'),
+            ],
+            'week' => [
+                'start' => now()->startOfWeek()->format('Y-m-d H:i:s.u'),
+                'end' => now()->endOfWeek()->format('Y-m-d H:i:s.u'),
+            ],
+            'month' => [
+                'start' => now()->startOfMonth()->format('Y-m-d H:i:s.u'),
+                'end' => now()->endOfMonth()->format('Y-m-d H:i:s.u'),
+            ],
+            'year' => [
+                'start' => now()->startOfYear()->format('Y-m-d H:i:s.u'),
+                'end' => now()->endOfYear()->format('Y-m-d H:i:s.u'),
+            ],
+        ];
+
+        return $pref_range->{$range} ?? [];
+    }
+
     public static function doValidate(?object &$r = null, array $rules, array ...$fields): mixed
     {
         $r = $r ?? self::INIT();

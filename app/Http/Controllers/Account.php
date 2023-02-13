@@ -6,7 +6,6 @@ use App\Mail\ResetPassword;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\PasswordResets as mPasswordResets;
-use App\Models\Tenants as mTenants;
 use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,10 +20,10 @@ class Account extends API
     public function doCreate(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'tenant_id' => ['nullable', 'uuid', 'size:32'],
             'name' => ['required', 'string', 'min:4', 'max:40'],
             'email' => ['required', 'email', 'max:255'],
-            'phone_country' => ['required', 'string', 'min:2', 'max:4'],
+            'phone_country' => ['required', 'string', 'size:2'],
+            'phone_country_dial' => ['nullable', 'string', 'min:2', 'max:5'],
             'phone' => ['required', 'string', 'min:4', 'max:32'],
             'brand_name' => ['required', 'string', 'min:4', 'max:110'],
             'password' => ['required', 'string', 'min:6', 'max:100'],
@@ -33,6 +32,15 @@ class Account extends API
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
+
+        $params['name'] = isset($params['name']) ? trim($params['name']) : null;
+        $params['email'] = isset($params['email']) ? trim($params['email']) : null;
+        $params['phone_country'] = isset($params['phone_country']) ? trim($params['phone_country']) : null;
+        $params['phone_country_dial'] = isset($params['phone_country_dial']) ? trim($params['phone_country_dial']) : null;
+        $params['phone'] = isset($params['phone']) ? trim($params['phone']) : null;
+        $params['brand_name'] = isset($params['brand_name']) ? trim($params['brand_name']) : null;
+        $params['password'] = isset($params['password']) ? trim($params['password']) : null;
+        $params['password_confirmation'] = isset($params['password_confirmation']) ? trim($params['password_confirmation']) : null;
 
         if (isset($params['phone_country']) && !preg_match('/^[A-Za-z]+$/', $params['phone_country'])) {
             $r->messages[] = (object) [
@@ -95,22 +103,11 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $params['tenant_id'] = $params['tenant_id'] ?? '2278df21-2f4f-40dd-918a-6650eb1e3e91';
-
-        if (!mTenants::where('id', '=', $params['tenant_id'])->exists()) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Tenant does not exist.'),
-            ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
         $company_id = Str::uuid()->toString();
 
         try {
             $company = new mLiveStreamCompanies;
             $company->id = $company_id;
-            $company->tenant_id = $params['tenant_id'];
             $company->name = $params['brand_name'];
             $company->save();
         } catch (\Exception $e) {
@@ -288,7 +285,8 @@ class Account extends API
             'created_at' => $company_user->created_at,
             'email' => $company_user->email,
             'logo' => $company->getLogo(),
-            'name' => $company->name,
+            'brand_name' => $company->name,
+            'name' => $company_user->name,
             'role' => $company_user->role,
         ];
         return response()->json($r, Response::HTTP_OK);

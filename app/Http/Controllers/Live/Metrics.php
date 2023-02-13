@@ -396,16 +396,25 @@ class Metrics extends API
             'offset' => ['nullable', 'integer', 'min:0'],
             'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
+            'pref_range' => ['nullable', 'string', 'in:today,yesterday,week,month,year'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
+        $params['pref_range'] = isset($params['pref_range']) ? trim($params['pref_range']) : null;
         $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.u');
         $params['end'] = now()->subDays($params['end'] ?? 30)->format('Y-m-d H:i:s.u');
         $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 30;
         $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
         $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
         $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
+
+        if ($params['pref_range'] !== null) {
+            $params['start'] = API::$pref_range->{$params['pref_range']}['start'];
+            $params['end'] = API::$pref_range->{$params['pref_range']}['end'];
+        }
+
+        $r->params = $params;
 
         $cache_tag = 'metrics_top_stories_';
         $cache_tag .= sha1(implode('_', $params));
@@ -415,7 +424,10 @@ class Metrics extends API
         try {
             $metrics = Cache::remember($cache_tag, now()->addSeconds(API::METRICS_CACHE_TIME), function () use ($params) {
                 return mStoryMetrics::select('story_id', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
-                    // ->whereBetween('created_at', [$params['start'], $params['end']])
+                    ->where(function ($query) use ($params) {
+                        $query->where('created_at', '>=', $params['start'])
+                            ->where('created_at', '<=', $params['end']);
+                    })
                     ->groupBy('story_id')
                     ->orderBy($params['order_by'] . '_sum', $params['order'])
                     ->offset($params['offset'])

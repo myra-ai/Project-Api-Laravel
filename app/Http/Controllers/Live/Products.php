@@ -23,42 +23,40 @@ class Products extends API
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'title' => ['required', 'string', 'min:4', 'max:110'],
-            'link' => ['required', 'string', 'url', 'max:300'],
+            'link' => ['nullable', 'string', 'url', 'max:300'],
             'price' => ['required', 'numeric', 'min:0'],
             'status' => ['nullable', 'integer', 'min:0', 'max:1'],
             'currency' => ['nullable', 'string', 'size:3', 'in:' . implode(',', API::$valid_currencies)],
             'description' => ['nullable', 'string', 'max:2000'],
             'images' => ['nullable', 'string'],
             'images_url' => ['nullable', 'array', 'min:1', 'max:10'],
+            'get_product' => ['nullable',  new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
 
         $product_id = Str::uuid()->toString();
 
-        if (isset($params['currency'])) {
-            $params['currency'] = strtoupper($params['currency']);
-        }
-        if (isset($params['description'])) {
-            $params['description'] = trim($params['description']);
-        }
-        if (isset($params['title'])) {
-            $params['title'] = trim($params['title']);
-        }
+        $params['currency'] = isset($params['currency']) ? strtoupper($params['currency']) : 'BRL';
+        $params['status'] = isset($params['status']) ? filter_var($params['status'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['description'] = isset($params['description']) ? trim($params['description']) : null;
+        $params['title'] = isset($params['title']) ? trim($params['title']) : null;
+        $params['price'] = isset($params['price']) ? (float) $params['price'] : 0;
+        $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['link'] = isset($params['link']) ? trim($params['link']) : null;
 
         try {
             $data = [
                 'id' => $product_id,
                 'company_id' => $params['company_id'],
                 'title' => $params['title'],
-                'status' => $params['status'] ?? false,
-                'currency' => $params['currency'] ?? 'BRL',
-                'description' => $params['description'] ?? null,
+                'status' => $params['status'],
+                'currency' => $params['currency'],
+                'description' => $params['description'],
                 'price' => $params['price'],
             ];
 
-            if (isset($params['link'])) {
-                $params['link'] = trim($params['link']);
+            if ($params['link'] !== null) {
                 if (($link = API::registerLink($params['link'], $r)) instanceof JsonResponse) {
                     return $link;
                 }
@@ -208,20 +206,44 @@ class Products extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        $product->refresh();
-
         $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('Product created successfully.'),
         ];
+
         $r->data = (object) [
             'id' => $product_id,
             'created' => now()->toISOString(),
-            'images' => $product->getImagesDetails(),
-            'link' => (object)[
-                'id' => $link->id,
-            ],
         ];
+
+        if ($params['get_product']) {
+            $check_interval = 300; // seconds
+            $timeout = 3; // seconds
+            $start = microtime(true);
+
+            // Wait for the product to be created (This method is not ideal, but work with database replication)
+            while (true) {
+                $product = mLiveStreamProducts::where('id', '=', $product_id)->first();
+                if ($product !== null) {
+                    break;
+                }
+                if (microtime(true) - $start >= $timeout) {
+                    $message = (object) [
+                        'type' => 'error',
+                        'message' => 'Product could not be found',
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = 'Product could not be found after ' . $timeout . ' seconds';
+                    }
+                    $r->messages[] = $message;
+                    return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+                usleep($check_interval * 1000);
+            }
+
+            $r->data->images = $product->getImagesDetails();
+            $r->data->link = $product->getLink();
+        }
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

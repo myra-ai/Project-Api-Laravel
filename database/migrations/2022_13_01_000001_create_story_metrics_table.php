@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('region', 80)->nullable()->default(null)->index();
             $table->string('state', 60)->nullable()->default(null)->index();
             $table->string('country', 60)->nullable()->default(null)->index();
-            $table->longText('user_agent')->nullable()->default(null)->index();
+            $table->text('user_agent')->nullable()->default(null)->index();
             $table->string('device', 80)->nullable()->default(null)->index();
             $table->string('os', 60)->nullable()->default(null)->index();
             $table->string('browser', 128)->nullable()->default(null)->index();

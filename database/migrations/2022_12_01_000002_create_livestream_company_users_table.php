@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('password', 255);
             $table->timestamp('email_verified_at', 6)->nullable()->default(null)->index();
             $table->string('phone_country', 2)->default('BR')->index();
-            $table->string('phone_country_dial', 5)->default('+55')->index();
+            $table->string('phone_country_dial', 5)->nullable()->default(null)->index();
             $table->string('phone', 80)->nullable()->default(null)->unique();
             $table->uuid('avatar')->nullable()->default(null)->index();
             $table->foreign('avatar')->references('id')->on('livestream_medias')->onDelete('cascade');
