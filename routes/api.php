@@ -77,9 +77,6 @@ Route::get('/product/{product_id}', [L\Products::class, 'getByProductID']);
 Route::put('/product/{product_id}', [L\Products::class, 'productUpdate']);
 Route::delete('/product/{product_id}', [L\Products::class, 'productDelete']);
 Route::delete('/product/image/{image_id}', [L\Products::class, 'removeImage']);
-Route::post('/product/{product_id}/metric/view', [L\Products::class, 'productMetricViews']);
-Route::post('/product/{product_id}/metric/click', [L\Products::class, 'productMetricClicks']);
-Route::get('/product/{product_id}/metrics', [L\Products::class, 'productMetrics']);
 
 Route::post('/media/{company_id}', [L\Medias::class, 'doUploadMediaByFile']);
 Route::post('/media/url/{company_id}', [L\Medias::class, 'doUploadMediaByUrl']);

@@ -22,19 +22,35 @@ class Stories extends Authenticatable
      */
     protected $fillable = [
         'id',
-        'company_id',
-        'media_id',
-        'title',
-        'publish',
-        'status',
+        'clicks',
         'comments',
+        'company_id',
+        'deleted_at',
         'dislikes',
         'likes',
+        'loads',
+        'media_id',
+        'publish',
         'shares',
+        'status',
+        'title',
         'views',
+    ];
+
+    protected $hidden = [
+        'id',
         'clicks',
-        'opens',
+        'comments',
+        'company_id',
+        'created_at',
         'deleted_at',
+        'dislikes',
+        'likes',
+        'loads',
+        'views',
+        'media_id',
+        'shares',
+        'updated_at',
     ];
 
     /**
@@ -50,12 +66,13 @@ class Stories extends Authenticatable
         'publish' => 'boolean',
         'status' => 'string',
         'comments' => 'integer',
+        'clicks' => 'integer',
+        'comments' => 'integer',
         'dislikes' => 'integer',
         'likes' => 'integer',
+        'loads' => 'integer',
         'shares' => 'integer',
         'views' => 'integer',
-        'clicks' => 'integer',
-        'opens' => 'integer',
         'deleted_at' => 'timestamp',
     ];
 

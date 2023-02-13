@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Live;
 
 use App\Http\Controllers\API;
+use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
-use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -843,7 +843,7 @@ class Products extends API
                 'message' => __('Product could not be updated.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -922,7 +922,7 @@ class Products extends API
                 'message' => __('Image could not be deleted.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -963,7 +963,7 @@ class Products extends API
                 'message' => __('Product could not be deleted.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -976,91 +976,6 @@ class Products extends API
         ];
         $r->data = (object) [
             'deleted_at' => $now,
-        ];
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function productMetricViews(Request $request, ?string $product_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($product = API::getProduct($r, $product_id)) instanceof JsonResponse) {
-            return $product;
-        }
-
-        try {
-            $product->increment('views');
-        } catch (\Exception $e) {
-            $message = [
-                'type' => 'error',
-                'message' => __('Failed to update live stream product.'),
-            ];
-            if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $r->success = true;
-        $r->data = 'OK';
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function productMetricClicks(Request $request, ?string $product_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($product = API::getProduct($r, $product_id)) instanceof JsonResponse) {
-            return $product;
-        }
-
-        try {
-            $product->increment('clicks');
-        } catch (\Exception $e) {
-            $message = [
-                'type' => 'error',
-                'message' => __('Failed to update live stream product.'),
-            ];
-            if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $r->success = true;
-        $r->data = 'OK';
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function productMetrics(Request $request, ?string $product_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($product = API::getProduct($r, $product_id)) instanceof JsonResponse) {
-            return $product;
-        }
-
-        $r->success = true;
-        $r->data = (object) [
-            'views' => $product->views,
-            'clicks' => $product->clicks,
         ];
         return response()->json($r, Response::HTTP_OK);
     }

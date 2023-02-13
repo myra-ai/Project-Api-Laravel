@@ -590,7 +590,7 @@ class Streams extends API
                 'message' => __('Failed to add live stream widget loads.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -624,7 +624,7 @@ class Streams extends API
                 'message' => __('Failed to add live stream widget clicks.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

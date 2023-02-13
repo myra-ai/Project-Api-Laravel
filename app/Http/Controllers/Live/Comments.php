@@ -18,16 +18,21 @@ class Comments extends API
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'text' => ['required', 'string', 'min:4', 'max:600'],
-            'name' => ['required', 'string', 'min:4', 'max:120'],
-            'email' => ['nullable', 'string', 'email', 'min:5', 'max:200'],
+            'name' => ['required', 'string', 'min:4', 'max:60'],
+            'email' => ['nullable', 'string', 'email', 'min:5', 'max:110'],
             'pinned' => ['nullable', 'string', new strBoolean],
             'is_streammer' => ['nullable', 'string', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
+        $params['text'] = isset($params['text']) ? trim($params['text']) : null;
+        $params['name'] = isset($params['name']) ? trim($params['name']) : null;
+        $params['email'] = isset($params['email']) ? trim($params['email']) : null;
+        $params['pinned'] = isset($params['pinned']) ? filter_var($params['pinned'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['is_streammer'] = isset($params['is_streammer']) ? filter_var($params['is_streammer'], FILTER_VALIDATE_BOOLEAN) : false;
 
         if (isset($params['stream_id'])) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
@@ -37,9 +42,7 @@ class Comments extends API
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
+        } else {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
@@ -49,15 +52,22 @@ class Comments extends API
 
         try {
             $qry = new mLiveStreamComments();
-            match (true) {
-                $stream !== null => $qry->stream_id = $stream->id,
-                $story !== null => $qry->story_id = $story->id,
-            };
+            if ($params['stream_id'] !== null) {
+                $qry->stream_id = $stream->id;
+                API::registerStreamMetric($request, $params, [
+                    'comment' => 1,
+                ]);
+            } else if ($params['story_id'] !== null) {
+                $qry->story_id = $story->id;
+                API::registerStoryMetric($request, $params, [
+                    'comment' => 1,
+                ]);
+            }
             $qry->text = $params['text'];
             $qry->name = $params['name'];
             $qry->email = $params['email'];
-            $qry->pinned = isset($params['pinned']) ? $params['pinned'] : false;
-            $qry->is_streammer = isset($params['is_streammer']) ? $params['is_streammer'] : false;
+            $qry->pinned = $params['pinned'];
+            $qry->is_streammer = $params['is_streammer'];
             $qry->created_at = now()->format('Y-m-d H:i:s.u');
             $qry->save();
         } catch (\Exception $e) {
@@ -73,10 +83,11 @@ class Comments extends API
         }
 
         try {
-            match (true) {
-                $stream !== null => $stream->increment('comments'),
-                $story !== null => $story->increment('comments'),
-            };
+            if ($params['stream_id'] !== null) {
+                $stream->increment('comments');
+            } else if ($params['story_id'] !== null) {
+                $story->increment('comments');
+            }
         } catch (\Exception $e) {
             // Ignore
         }
@@ -85,9 +96,9 @@ class Comments extends API
             'id' => $qry->id,
         ];
         $r->data_info = (object) [
-            'comments' => match (true) {
-                $stream !== null => $stream->comments,
-                $story !== null => $story->comments,
+            'comments' => match ($params['stream_id'] !== null) {
+                true => $stream->comments,
+                default => $story->comments,
             },
         ];
         $r->success = true;
@@ -97,19 +108,26 @@ class Comments extends API
     public function getComments(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'offset' => ['nullable', 'integer', 'min:0'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
-            'order_by' => ['nullable', 'string', 'in:created_at,pinned,is_streammer'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:80'],
+            'order_by' => ['nullable', 'string', 'in:id,created_at,pinned,is_streammer'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
             'separe_pinned' => ['nullable', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
+        $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+        $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 80;
+        $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'created_at';
+        $params['order'] = isset($params['order']) ? trim($params['order']) : 'asc';
+        $params['separe_pinned'] = isset($params['separe_pinned']) ? filter_var($params['separe_pinned'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
 
         if (isset($params['stream_id'])) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
@@ -119,9 +137,7 @@ class Comments extends API
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
+        } else {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
@@ -130,69 +146,65 @@ class Comments extends API
         }
 
         $comments = [];
-        $pinned = null;
+        $pinned_comment = null;
+
+        $cache_tag = match ($params['stream_id'] !== null) {
+            true => 'stream_comments_list_' . $stream->id,
+            default => 'story_comments_list_' . $story->id,
+        };
+
+        $cache_tag .= implode('_', [
+            $params['offset'],
+            $params['limit'],
+            $params['order_by'],
+            $params['order'],
+            $params['separe_pinned'],
+        ]);
 
         try {
-            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
-            $params['limit'] = isset($params['limit']) ? $params['limit'] : 100;
-            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
-            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
-            $params['separe_pinned'] = isset($params['separe_pinned']) ? $params['separe_pinned'] : false;
-
-            $cache_tag = match (true) {
-                $stream !== null => 'stream_comments_list_' . $stream->id,
-                $story !== null => 'story_comments_list_' . $story->id,
-            };
-
-            $cache_tag .= implode('_', [
-                $params['offset'],
-                $params['limit'],
-                $params['order_by'],
-                $params['order'],
-                $params['separe_pinned'],
-            ]);
-
-            $comments = Cache::remember($cache_tag, now()->addSeconds(1), function () use ($stream, $story, $params) {
-                $qry = mLiveStreamComments::select([
-                    'id',
-                    'text',
-                    'name',
-                    'pinned',
-                    'is_streammer',
-                ]);
-                match (true) {
-                    $stream !== null => $qry->where('stream_id', '=', $stream->id),
-                    $story !== null => $qry->where('story_id', '=', $story->id),
-                };
-                if (isset($params['order_by'])) {
-                    $qry->orderBy($params['order_by'], $params['order']);
+            $comments = Cache::remember($cache_tag, now()->addSeconds(API::COMMENTS_CACHE_TIME), function () use ($params) {
+                $qry = mLiveStreamComments::select(match ($params['token'] !== null) {
+                    true => [
+                        'id',
+                        'text',
+                        'name',
+                        'pinned',
+                        'is_streammer',
+                    ],
+                    default => [
+                        'text',
+                        'name',
+                        'pinned',
+                        'is_streammer',
+                    ]
+                });
+                if ($params['stream_id'] !== null) {
+                    $qry->where('stream_id', '=', $params['stream_id']);
+                } else if ($params['story_id'] !== null) {
+                    $qry->where('story_id', '=', $params['story_id']);
                 }
-                if (isset($params['separe_pinned']) && $params['separe_pinned']) {
+                if ($params['separe_pinned']) {
                     $qry->where('pinned', '=', false);
                 }
-                if (isset($params['offset'])) {
-                    $qry->offset($params['offset']);
-                }
-                if (isset($params['limit'])) {
-                    $qry->limit($params['limit']);
-                }
+                $qry->offset($params['offset']);
+                $qry->limit($params['limit']);
+                $qry->orderBy($params['order_by'], $params['order']);
                 return $qry->get();
             });
 
             if ($params['separe_pinned']) {
-                $pinned = Cache::remember($cache_tag . '_pinned', now()->addSeconds(API::CACHE_TIME), function () use ($stream, $story, $params) {
+                $pinned_comment = Cache::remember($cache_tag . '_pinned', now()->addSeconds(API::COMMENTS_CACHE_TIME), function () use ($params) {
                     $qry = mLiveStreamComments::select([
                         'text',
                         'name',
                     ]);
-                    match (true) {
-                        $stream !== null => $qry->where('stream_id', '=', $stream->id),
-                        $story !== null => $qry->where('story_id', '=', $story->id),
-                    };
-                    $qry->where('pinned', '=', true);
-                    if (isset($params['order_by'])) {
-                        $qry->orderBy($params['order_by'], $params['order'] ?? 'asc');
+                    if ($params['stream_id'] !== null) {
+                        $qry->where('stream_id', '=', $params['stream_id']);
+                    } else if ($params['story_id'] !== null) {
+                        $qry->where('story_id', '=', $params['story_id']);
                     }
+                    $qry->where('pinned', '=', true);
+                    $qry->orderBy($params['order_by'], $params['order']);
                     return $qry->first();
                 });
             }
@@ -202,7 +214,7 @@ class Comments extends API
                 'message' => __('Failed to get comments.'),
             ];
             if (config('app.debug')) {
-                $message->debug = __($e->getMessage());
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -210,19 +222,18 @@ class Comments extends API
 
         $r->data = $comments;
         $r->data_info = (object) [
-            'pinned' => $pinned,
-            'offset' => (int) $params['offset'],
-            'limit' => (int) $params['limit'],
+            'pinned' => $pinned_comment,
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
             'count' => count($comments),
-            'total' => match (true) {
-                $stream !== null => $stream->comments,
-                $story !== null => $story->comments,
+            'total' => match ($params['stream_id'] !== null) {
+                true => $stream->comments_count,
+                default => $story->comments_count,
             },
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
-
 
     public function getCommentsCount(Request $request): JsonResponse
     {
@@ -233,20 +244,18 @@ class Comments extends API
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
 
-        if (isset($params['stream_id'])) {
+        if ($params['stream_id'] !== null) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
                 return $stream;
             }
-        } else if (isset($params['story_id'])) {
+        } else if ($params['story_id'] !== null) {
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
+        } else {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
@@ -257,27 +266,27 @@ class Comments extends API
         $count = 0;
 
         try {
-            $count = Cache::remember('stream_comments_' . $stream->id, now()->addSeconds(5), function () use ($stream, $story) {
-                if ($stream !== null) {
-                    $count = mLiveStreamComments::where('stream_id', '=', $stream->id)->where('deleted_at', '=', null)->count();
+            $count = match ($params['stream_id'] !== null) {
+                true => Cache::remember('stream_comments_' . $params['stream_id'], now()->addSeconds(API::COMMENTS_CACHE_TIME), function () use ($params, $stream) {
+                    $count = mLiveStreamComments::where('stream_id', '=', $params['stream_id'])->where('deleted_at', '=', null)->count();
                     $stream->comments = $count;
                     $stream->save();
                     return $count;
-                } else if ($story !== null) {
-                    $count = mLiveStreamComments::where('story_id', '=', $story->id)->where('deleted_at', '=', null)->count();
+                }),
+                default => Cache::remember('story_comments_' . $params['story_id'], now()->addSeconds(API::COMMENTS_CACHE_TIME), function () use ($params, $story) {
+                    $count = mLiveStreamComments::where('story_id', '=', $params['story_id'])->where('deleted_at', '=', null)->count();
                     $story->comments = $count;
                     $story->save();
                     return $count;
-                }
-                return 0;
-            });
+                })
+            };
         } catch (\Exception $e) {
             $message = [
                 'type' => 'error',
-                'message' => __('Failed to calculate live stream comments.'),
+                'message' => __('Failed to get comments count.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

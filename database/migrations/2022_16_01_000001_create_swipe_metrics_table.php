@@ -19,9 +19,9 @@ return new class extends Migration
             $table->foreign('swipe_id')->references('id')->on('swipes')->onDelete('cascade');
             $table->timestamp('created_at', 6)->useCurrent();
             $table->string('ip', 128)->nullable()->default(null)->index();
-            $table->string('country', 80)->nullable()->default(null)->index();
-            $table->string('city', 60)->nullable()->default(null)->index();
-            $table->string('region', 60)->nullable()->default(null)->index();
+            $table->string('region', 80)->nullable()->default(null)->index();
+            $table->string('state', 60)->nullable()->default(null)->index();
+            $table->string('country', 60)->nullable()->default(null)->index();
             $table->longText('user_agent')->nullable()->default(null)->index();
             $table->string('device', 80)->nullable()->default(null)->index();
             $table->string('os', 60)->nullable()->default(null)->index();

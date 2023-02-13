@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Live;
 
 use App\Http\Controllers\API;
-use App\Models\LiveStreams as mLiveStreams;
+use App\Models\LiveStreamMetrics as mLiveStreamMetrics;
+use App\Models\StoryMetrics as mStoryMetrics;
+use App\Models\SwipeMetrics as mSwipeMetrics;
 use App\Models\WebLogs as mWebLogs;
 use App\Rules\strBoolean;
 use App\Rules\Timestamp;
@@ -16,7 +18,7 @@ use Illuminate\Support\Str;
 
 class Metrics extends API
 {
-    public function getMostAccessedIp(Request $request): JsonResponse
+    public function getGlobalMostAccessedIp(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'last_days' => ['nullable', 'integer', 'min:1', 'max:90'],
@@ -50,7 +52,7 @@ class Metrics extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getMostAccessedCity(Request $request): JsonResponse
+    public function getGlobalMostAccessedCity(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'last_days' => ['nullable', 'integer', 'min:1', 'max:90'],
@@ -84,7 +86,7 @@ class Metrics extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getMostAccessedCountry(Request $request): JsonResponse
+    public function getGlobalMostAccessedCountry(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'last_days' => ['nullable', 'integer', 'min:1', 'max:90'],
@@ -118,7 +120,7 @@ class Metrics extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getMostAccessedReferer(Request $request): JsonResponse
+    public function getGlobalMostAccessedReferer(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'last_days' => ['nullable', 'integer', 'min:1', 'max:90'],
@@ -152,7 +154,7 @@ class Metrics extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getTotalAccessByDays(Request $request): JsonResponse
+    public function getGlobalTotalAccessByDays(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'start' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -186,7 +188,7 @@ class Metrics extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getAverageAccessByDays(Request $request): JsonResponse
+    public function getGlobalAverageAccessByDays(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'start' => ['nullable', 'integer', 'min:0', 'max:100'],
@@ -283,7 +285,7 @@ class Metrics extends API
                 'message' => __('Failed to add live stream widget loads.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -335,7 +337,7 @@ class Metrics extends API
                 'message' => __('Failed to add live stream widget clicks.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -344,6 +346,34 @@ class Metrics extends API
         $r->data = (object) [
             'widget_clicks' => $stream->widget_clicks
         ];
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
+    public function getTopStreams(Request $request): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'start' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'end' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'order_by' => ['nullable', 'string', 'in:ip,region,state,country,device,os,browser,load,click,like,unlike,dislike,undislike,view,share,comment'],
+            'order' => ['nullable', 'string', 'in:asc,desc'],
+        ], $request->all())) instanceof JsonResponse) {
+            return $params;
+        }
+
+        $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.000000');
+        $params['end'] = now()->subDays($params['end'] ?? 7)->format('Y-m-d H:i:s.000000');
+        $params['order_by'] = $params['order_by'] ?? 'view';
+        $params['order'] = $params['order'] ?? 'desc';
+
+        // group mLivestrems by stream_id and sum views
+        $data = mLiveStreamMetrics::select('stream_id', DB::raw('SUM(' . $params['order_by'] . ') as ' . $params['order_by']))
+            ->whereBetween('created_at', [$params['start'], $params['end']])
+            ->groupBy('stream_id')
+            ->orderBy($params['order_by'], $params['order'])
+            ->get();
+
+        $r->data = $data;
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

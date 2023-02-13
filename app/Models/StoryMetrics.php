@@ -12,7 +12,7 @@ class StoryMetrics extends Authenticatable
 
     protected $table = 'story_metrics';
     protected $primaryKey = 'id';
-    public $timestamps = true;
+    public $timestamps = false;
 
     /**
      * The attributes that are mass assignable.
@@ -24,9 +24,9 @@ class StoryMetrics extends Authenticatable
         'story_id',
         'created_at',
         'ip',
-        'country',
-        'city',
         'region',
+        'state',
+        'country',
         'user_agent',
         'device',
         'os',
@@ -52,9 +52,9 @@ class StoryMetrics extends Authenticatable
         'story_id' => 'string',
         'created_at' => 'timestamp',
         'ip' => 'string',
-        'country' => 'string',
-        'city' => 'string',
         'region' => 'string',
+        'state' => 'string',
+        'country' => 'string',
         'user_agent' => 'string',
         'device' => 'string',
         'os' => 'string',

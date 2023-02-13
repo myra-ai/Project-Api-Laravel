@@ -19,8 +19,8 @@ class Likes extends API
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
 
         if (isset($params['stream_id'])) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
@@ -30,22 +30,26 @@ class Likes extends API
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
-            $r->messages[] = (object) [
+        } else {
+            $r->messages[] = [
                 'type' => 'error',
-                'message' => __('Stream ID or Story ID is required.'),
+                'message' => __('Invalid stream or story ID.'),
             ];
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         try {
-            if ($stream !== null) {
+            if ($params['stream_id'] !== null) {
                 $stream->increment('likes');
+                API::registerStreamMetric($request, $params, [
+                    'like' => 1,
+                ]);
                 Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(self::CACHE_TIME));
-            } else if ($story !== null) {
+            } else {
                 $story->increment('likes');
+                API::registerStoryMetric($request, $params, [
+                    'like' => 1,
+                ]);
                 Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(self::CACHE_TIME));
             }
         } catch (\Exception $e) {
@@ -54,23 +58,23 @@ class Likes extends API
                 'message' => __('Failed to add like.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         $r->data = (object) [
-            'likes' => match (true) {
-                $stream !== null => $stream->likes,
-                $story !== null => $story->likes,
+            'likes' => match ($params['stream_id'] !== null) {
+                true => $stream->likes,
+                default => $story->likes,
             },
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function removeLike(Request $request, ?string $stream_id = null): JsonResponse
+    public function removeLike(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
@@ -79,8 +83,8 @@ class Likes extends API
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
 
         if (isset($params['stream_id'])) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
@@ -90,9 +94,7 @@ class Likes extends API
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
+        } else {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
@@ -101,9 +103,12 @@ class Likes extends API
         }
 
         try {
-            if ($stream !== null) {
+            if ($params['stream_id'] !== null) {
                 if ($stream->likes > 1) {
                     $stream->decrement('likes');
+                    API::registerStreamMetric($request, $params, [
+                        'unlike' => 1,
+                    ]);
                     Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(self::CACHE_TIME));
                 } else {
                     $r->messages[] = (object) [
@@ -112,9 +117,12 @@ class Likes extends API
                     ];
                     $stream->likes = 0;
                 }
-            } else if ($story !== null) {
+            } else {
                 if ($story->likes > 1) {
                     $story->decrement('likes');
+                    API::registerStoryMetric($request, $params, [
+                        'unlike' => 1,
+                    ]);
                     Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(self::CACHE_TIME));
                 } else {
                     $r->messages[] = (object) [
@@ -123,16 +131,6 @@ class Likes extends API
                     ];
                     $story->likes = 0;
                 }
-            } else {
-                $message = (object) [
-                    'type' => 'error',
-                    'message' => __('Failed to remove like.'),
-                ];
-                if (config('app.debug')) {
-                    $message->debug = __('No stream or story found.');
-                }
-                $r->messages[] = $message;
-                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
             }
         } catch (\Exception $e) {
             $message = [
@@ -140,23 +138,23 @@ class Likes extends API
                 'message' => __('Failed to remove like.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         $r->data = (object) [
-            'likes' => match (true) {
-                $stream !== null => $stream->likes,
-                $story !== null => $story->likes,
+            'likes' => match ($params['stream_id'] !== null) {
+                true => $stream->likes,
+                default => $story->likes,
             },
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getLikes(Request $request, ?string $stream_id = null): JsonResponse
+    public function getLikes(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
@@ -165,20 +163,18 @@ class Likes extends API
             return $params;
         }
 
-        $stream = null;
-        $story = null;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
 
-        if (isset($params['stream_id'])) {
+        if ($params['stream_id'] !== null) {
             if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
                 return $stream;
             }
-        } else if (isset($params['story_id'])) {
+        } else if ($params['story_id'] !== null) {
             if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
                 return $story;
             }
-        }
-
-        if ($stream === null && $story === null) {
+        } else {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream ID or Story ID is required.'),
@@ -187,9 +183,9 @@ class Likes extends API
         }
 
         $r->data = (object) [
-            'likes' => match (true) {
-                $stream !== null => $stream->likes,
-                $story !== null => $story->likes,
+            'likes' => match ($params['stream_id'] !== null) {
+                true => $stream->likes,
+                default => $story->likes,
             },
         ];
         $r->success = true;

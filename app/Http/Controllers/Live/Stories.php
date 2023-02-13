@@ -44,6 +44,13 @@ class Stories extends API
         }
 
         try {
+            $data = [
+                'id' => $story_id,
+                'company_id' => $params['company_id'],
+                'title' => $params['title'],
+                'media_id' => $params['media_id'],
+            ];
+
             if ($params['media_id'] !== null) {
                 if (!mLiveStreamMedias::where('id', '=', $params['media_id'])->exists()) {
                     $message = (object)[
@@ -53,14 +60,10 @@ class Stories extends API
                     $r->messages[] = $message;
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
+                $data['status'] = 'ACTIVE';
             }
 
-            mStories::create([
-                'id' => $story_id,
-                'company_id' => $params['company_id'],
-                'title' => $params['title'],
-                'media_id' => $params['media_id'],
-            ]);
+            mStories::create($data);
 
             if ($params['products'] !== null) {
                 $params['products'] = explode(';', $params['products']);
@@ -147,19 +150,44 @@ class Stories extends API
             return $story;
         }
 
+        $params['title'] = isset($params['title']) ? trim($params['title']) : null;
+        $params['media_id'] = isset($params['media_id']) ? trim($params['media_id']) : null;
+        $params['status'] = isset($params['status']) ? strtoupper(trim($params['status'])) : null;
+        $params['publish'] = isset($params['status']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
+
         try {
-            if (isset($params['title'])) {
+            if ($params['title'] !== null) {
                 $story->title = $params['title'];
             }
-            if (isset($params['media_id'])) {
+            if ($params['media_id'] !== null) {
                 $story->media_id = $params['media_id'];
             }
-            if (isset($params['status'])) {
+            if ($params['status'] !== null) {
+                if ($params['status'] === 'ACTIVE') {
+                    if ($story->media_id && $params['media_id'] === null) {
+                        $r->messages[] = (object) [
+                            'type' => 'error',
+                            'message' => __('Story must have a media to be active.'),
+                        ];
+                        return response()->json($r, Response::HTTP_BAD_REQUEST);
+                    }
+                }
+
+                if ($params['status'] === 'DELETED') {
+                    if ($story->publish === true) {
+                        $r->messages[] = (object) [
+                            'type' => 'error',
+                            'message' => __('Story must be unpublished to be deleted.'),
+                        ];
+                        return response()->json($r, Response::HTTP_BAD_REQUEST);
+                    }
+                }
+
                 $story->status = $params['status'];
             }
             if (isset($params['publish'])) {
                 if ($params['publish'] === true) {
-                    if ($params['status'] !== 'active' || $story->status !== 'active') {
+                    if ($params['status'] !== 'ACTIVE' || $story->status !== 'ACTIVE') {
                         $r->messages[] = (object) [
                             'type' => 'error',
                             'message' => __('Story must be active to be published.'),
@@ -167,6 +195,7 @@ class Stories extends API
                         return response()->json($r, Response::HTTP_BAD_REQUEST);
                     }
                 }
+
                 $story->publish = $params['publish'];
             }
             $story->save();
@@ -223,7 +252,7 @@ class Stories extends API
                 'message' => __('Failed to delete story.'),
             ];
             if (env('APP_DEBUG', false)) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
         }
@@ -327,7 +356,7 @@ class Stories extends API
                 'message' => __('Failed to get story list.'),
             ];
             if (env('APP_DEBUG', false)) {
-                $message['debug'] = __($e->getMessage());
+                $message['debug'] = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

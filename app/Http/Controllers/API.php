@@ -6,17 +6,24 @@ use App\Http\StreamServices\AntMedia\Stream as AntMediaStream;
 use App\Http\StreamServices\Mux\Stream as MuxStream;
 use App\Models\Links as mLinks;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
-use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\LiveStreamCompanyTokens as mLiveStreamCompanyTokens;
+use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
+use App\Models\LiveStreamMetrics as mLiveStreamMetrics;
+use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
 use App\Models\LiveStreamProducts as mLiveStreamProducts;
 use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
-use App\Models\LiveStreamProductGroups as mLiveStreamProductGroups;
 use App\Models\LiveStreams as mLiveStreams;
 use App\Models\Stories as mStories;
+use App\Models\StoryMetrics as mStoryMetrics;
+use App\Models\SwipeMetrics as mSwipeMetrics;
+use Browser;
 use FFMpeg\Coordinate\Dimension;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
+use GeoIp2\Database\Reader;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -37,6 +44,19 @@ class API extends Controller
     const MEDIA_TYPE_ARCHIVE = 6;
 
     const CACHE_TIME = 3;
+    const COMMENTS_CACHE_TIME = 1;
+    const LIVESTREAM_CACHE_TIME = 3;
+    const METRICS_CACHE_TIME = 300;
+    const PRODUCTS_CACHE_TIME = 3;
+    const STORY_CACHE_TIME = 3;
+
+    const STORY_STATUS_DRAFT = 0;
+    const STORY_STATUS_ACTIVE = 1;
+    const STORY_STATUS_ARCHIVE = 2;
+    const STORY_STATUS_DELETED = 3;
+
+    const STORY_NOT_PUBLISHED = 0;
+    const STORY_PUBLISHED = 1;
 
     const MEDIA_RAW_BY_ID_URL = '/media/raw/id/';
     const MEDIA_THUMBNAIL_RAW_BY_ID_URL = '/media/raw/thumbnail/';
@@ -260,13 +280,8 @@ class API extends Controller
 
     public static function doGenerateLinkID(int $length = 8): string
     {
-        $characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_.';
-        $charactersLength = strlen($characters);
-        $randomString = '';
-        for ($i = 0; $i < $length; $i++) {
-            $randomString .= $characters[rand(0, $charactersLength - 1)];
-        }
-        return $randomString;
+        $pool = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_.';
+        return substr(str_shuffle(str_repeat($pool, 4)), 0, $length);
     }
 
     public static function doValidate(?object &$r = null, array $rules, array ...$fields): mixed
@@ -1527,5 +1542,181 @@ class API extends Controller
         }
 
         return $link;
+    }
+
+    public static function registerStreamMetric(Request $request, array $params, array $metrics, ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $ip = $request->ip();
+        $region = null;
+        $state = null;
+        $country = null;
+        $userAgent = $request->userAgent();
+        $browser = null;
+        $device = null;
+        $os = null;
+
+        $metrics['load'] = isset($metrics['load']) ? $metrics['load'] : 0;
+        $metrics['click'] = isset($metrics['click']) ? $metrics['click'] : 0;
+        $metrics['like'] = isset($metrics['like']) ? $metrics['like'] : 0;
+        $metrics['unlike'] = isset($metrics['unlike']) ? $metrics['unlike'] : 0;
+        $metrics['dislike'] = isset($metrics['dislike']) ? $metrics['dislike'] : 0;
+        $metrics['undislike'] = isset($metrics['undislike']) ? $metrics['undislike'] : 0;
+        $metrics['view'] = isset($metrics['view']) ? $metrics['view'] : 0;
+        $metrics['share'] = isset($metrics['share']) ? $metrics['share'] : 0;
+        $metrics['comment'] = isset($metrics['comment']) ? $metrics['comment'] : 0;
+
+        try {
+            $db_city = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
+            $region = $db_city->city($ip);
+            $state = $region->mostSpecificSubdivision->isoCode ?? null;
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        try {
+            $db_country = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
+            $country = $db_country->country($ip);
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        try {
+            if (!empty($userAgent)) {
+                $b = Browser::parse($userAgent);
+                $browser = $b->browserFamily();
+                $device = $b->deviceFamily();
+                $os = $b->platformFamily();
+            }
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        $metric = [
+            'stream_id' => $params['stream_id'],
+            'created_at' => now()->format('Y-m-d H:i:s.u'),
+            'ip' => $request->ip(),
+            'region' => $region,
+            'state' => $state,
+            'country' => $country,
+            'user_agent' => $userAgent,
+            'device' => $device,
+            'os' => $os,
+            'browser' => $browser,
+            'load' => $metrics['load'],
+            'click' => $metrics['click'],
+            'like' => $metrics['like'],
+            'unlike' => $metrics['unlike'],
+            'dislike' => $metrics['dislike'],
+            'undislike' => $metrics['undislike'],
+            'view' => $metrics['view'],
+            'share' => $metrics['share'],
+            'comment' => $metrics['comment'],
+        ];
+
+        try {
+            mLiveStreamMetrics::insert($metric);
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => 'Error while saving story metrics',
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return (object) $metric;
+    }
+
+    public static function registerStoryMetric(Request $request, array $params, array $metrics, ?object &$r = null): object
+    {
+        $r = $r ?? self::INIT();
+
+        $ip = $request->ip();
+        $region = null;
+        $state = null;
+        $country = null;
+        $userAgent = $request->userAgent();
+        $browser = null;
+        $device = null;
+        $os = null;
+
+        $metrics['load'] = isset($metrics['load']) ? $metrics['load'] : 0;
+        $metrics['click'] = isset($metrics['click']) ? $metrics['click'] : 0;
+        $metrics['like'] = isset($metrics['like']) ? $metrics['like'] : 0;
+        $metrics['unlike'] = isset($metrics['unlike']) ? $metrics['unlike'] : 0;
+        $metrics['dislike'] = isset($metrics['dislike']) ? $metrics['dislike'] : 0;
+        $metrics['undislike'] = isset($metrics['undislike']) ? $metrics['undislike'] : 0;
+        $metrics['view'] = isset($metrics['view']) ? $metrics['view'] : 0;
+        $metrics['share'] = isset($metrics['share']) ? $metrics['share'] : 0;
+        $metrics['comment'] = isset($metrics['comment']) ? $metrics['comment'] : 0;
+
+        try {
+            $db_city = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
+            $region = $db_city->city($ip);
+            $state = $region->mostSpecificSubdivision->isoCode ?? null;
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        try {
+            $db_country = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
+            $country = $db_country->country($ip);
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        try {
+            if (!empty($userAgent)) {
+                $b = Browser::parse($userAgent);
+                $browser = $b->browserFamily();
+                $device = $b->deviceFamily();
+                $os = $b->platformFamily();
+            }
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        $metric = [
+            'stream_id' => $params['stream_id'],
+            'created_at' => now()->format('Y-m-d H:i:s.u'),
+            'ip' => $request->ip(),
+            'region' => $region,
+            'state' => $state,
+            'country' => $country,
+            'user_agent' => $userAgent,
+            'device' => $device,
+            'os' => $os,
+            'browser' => $browser,
+            'load' => $metrics['load'],
+            'click' => $metrics['click'],
+            'like' => $metrics['like'],
+            'unlike' => $metrics['unlike'],
+            'dislike' => $metrics['dislike'],
+            'undislike' => $metrics['undislike'],
+            'view' => $metrics['view'],
+            'share' => $metrics['share'],
+            'comment' => $metrics['comment'],
+        ];
+
+        try {
+            mStoryMetrics::insert($metric);
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => 'Error while saving story metrics',
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return (object) $metric;
     }
 }

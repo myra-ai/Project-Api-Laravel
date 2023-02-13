@@ -13,10 +13,12 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('swipes', function (Blueprint $table) {
+        Schema::create('swipe_groups', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('title', 255)->nullable()->default(null);
-            $table->timestamp('deleted_at', 6)->nullable()->default(null);
+            $table->uuid('swipe_id')->nullable()->default(null)->index();
+            $table->foreign('swipe_id')->references('id')->on('swipes')->onDelete('cascade');
+            $table->uuid('story_id')->nullable()->default(null)->index();
+            $table->foreign('story_id')->references('id')->on('stories')->onDelete('cascade');
             $table->timestamps(6);
         });
     }
@@ -28,6 +30,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('swipes');
+        Schema::dropIfExists('swipe_groups');
     }
 };
