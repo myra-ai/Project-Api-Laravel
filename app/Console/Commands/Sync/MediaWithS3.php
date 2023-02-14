@@ -1,19 +1,19 @@
 <?php
 
-namespace App\Console\Commands\Live;
+namespace App\Console\Commands\Sync;
 
 use Illuminate\Console\Command;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
 use App\Http\Controllers\API;
 
-class SyncWithS3 extends Command
+class MediaWithS3 extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'command:live/sync_with_s3';
+    protected $signature = 'command:sync/media_with_s3';
 
     /**
      * The console command description.
@@ -29,17 +29,17 @@ class SyncWithS3 extends Command
      */
     public function handle()
     {
-        mLiveStreamMedias::where('s3_available', '=', null)->chunk(250, function ($medias) {
+        mLiveStreamMedias::where('s3_available', '=', null)->chunk(100, function ($medias) {
             if (count($medias) === 0) {
                 return Command::SUCCESS;
             }
-    
+
             foreach ($medias as $media) {
-                echo "Syncing media {$media->id} with CDN" . PHP_EOL;
+                $this->info("[::] Syncing media {$media->id} with S3");
                 if (API::doSyncMediaWithCDN($media) !== false) {
-                    echo " [+] Media {$media->id} synced with CDN" . PHP_EOL;
+                    $this->info(" [+] Synced media with S3");
                 } else {
-                    echo " [/] Media {$media->id} failed to sync with CDN" . PHP_EOL;
+                    $this->info(" [-] Failed to sync media with S3");
                 }
             }
         });

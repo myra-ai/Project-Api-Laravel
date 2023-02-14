@@ -168,8 +168,9 @@ class Account extends API
             'message' => __('Account created successfully.'),
         ];
 
+        $r->success = true;
         $r->data = (object) [
-            'token' => $token,
+            'login_token' => $token,
             'token_expires_at' => $token_expires_at->toDateTimeString(),
             'company_id' => $company_id,
             'company_user_id' => $company_user_id,

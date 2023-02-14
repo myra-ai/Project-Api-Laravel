@@ -1180,14 +1180,18 @@ class API extends Controller
         return $media;
     }
 
-    public static function doSyncMediaWithCDN(object $media, ?object &$r = null)
+    public static function doSyncMediaWithCDN(?object $media, ?object &$r = null): bool|string
     {
+        if ($media === null) {
+            return false;
+        }
+
         if ($media->s3_available === null) {
             $in_s3 = false;
-            if (Storage::disk('s3')->has($media->path) === false) {
+            if (Storage::disk('s3')->exists($media->path) === false) {
                 $file = Storage::disk('public')->get($media->path);
 
-                if ($file === false) {
+                if ($file === false || $file === null) {
                     $r->messages[] = [
                         'type' => 'error',
                         'message' => __('File not found.'),

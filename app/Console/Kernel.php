@@ -3,7 +3,8 @@
 namespace App\Console;
 
 use App\Console\Commands\Live\StreamStatusCheck;
-use App\Console\Commands\Live\SyncWithS3;
+use App\Console\Commands\Sync\MediaWithS3;
+use App\Console\Commands\Sync\AssetsWithS3;
 use App\Console\Commands\Metrics\DeployLogs;
 use App\Console\Commands\removeTokensExpired;
 use Illuminate\Console\Scheduling\Schedule;
@@ -22,7 +23,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command(DeployLogs::class)->everyTenMinutes();
         $schedule->command(removeTokensExpired::class)->everyTenMinutes();
-        $schedule->command(SyncWithS3::class)->everyFiveMinutes();
+        $schedule->command(MediaWithS3::class)->everyFiveMinutes();
+        $schedule->command(AssetsWithS3::class)->everyFiveMinutes();
     }
 
     protected function shortSchedule(ShortSchedule $shortSchedule)
