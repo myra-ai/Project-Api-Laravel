@@ -1180,8 +1180,10 @@ class API extends Controller
         return $media;
     }
 
-    public static function doSyncMediaWithCDN(?object $media, ?object &$r = null): bool|string
+    public static function doSyncMediaWithCDN(?object $media, ?object &$r = null): mixed
     {
+        $r = $r ?? self::INIT();
+
         if ($media === null) {
             return false;
         }
@@ -1209,16 +1211,15 @@ class API extends Controller
             } else {
                 $in_s3 = true;
             }
+            
             if ($in_s3 === true) {
                 $media->s3_available = now()->format('Y-m-d H:i:s.u');
                 $media->save();
             }
             return self::getMediaCdnUrl($media->path);
-        } else {
-            return self::getMediaCdnUrl($media->path);
         }
 
-        return false;
+        return self::getMediaCdnUrl($media->path);
     }
 
     public static function getMediaByPath(?object &$r = null, string $path): object
