@@ -291,7 +291,7 @@ class Comments extends API
                 })
             };
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to get comments count.'),
             ];

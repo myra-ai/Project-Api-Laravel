@@ -157,7 +157,7 @@ class Medias extends API
         $file = Storage::disk('public')->get($media->path);
 
         if ($file === false) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('File not found.'),
             ];
@@ -186,7 +186,7 @@ class Medias extends API
         $thumbnail = $media->getThumbnail();
 
         if ($thumbnail === null) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Thumbnail not found.'),
             ];
@@ -204,7 +204,7 @@ class Medias extends API
         $file = Storage::disk('public')->get($thumbnail->path);
 
         if ($file === false) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('File not found.'),
             ];
@@ -233,7 +233,7 @@ class Medias extends API
         $file = Storage::disk('public')->get($media->path);
 
         if ($file === false) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('File not found.'),
             ];

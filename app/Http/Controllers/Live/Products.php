@@ -860,7 +860,7 @@ class Products extends API
             }
             $product->save();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Product could not be updated.'),
             ];
@@ -939,7 +939,7 @@ class Products extends API
         try {
             $image->delete();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Image could not be deleted.'),
             ];
@@ -980,7 +980,7 @@ class Products extends API
             $product->deleted_at = $now;
             $product->save();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Product could not be deleted.'),
             ];

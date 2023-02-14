@@ -24,7 +24,7 @@ class Links extends API
         try {
             $link->increment('clicks');
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to redirect link.'),
             ];

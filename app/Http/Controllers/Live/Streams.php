@@ -62,7 +62,7 @@ class Streams extends API
                     'name' => $params['title'],
                 ]);
                 if ($live === null || empty($live)) {
-                    $r->messages[] = [
+                    $r->messages[] = (object) [
                         'type' => 'error',
                         'message' => __('Stream service returned empty response.'),
                     ];
@@ -97,7 +97,7 @@ class Streams extends API
                 }
                 break;
             default:
-                $r->messages[] = [
+                $r->messages[] = (object) [
                     'type' => 'error',
                     'message' => __('Stream service not supported.'),
                 ];
@@ -105,7 +105,7 @@ class Streams extends API
                 break;
         }
 
-        $r->messages[] = [
+        $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('Stream created successfully.'),
         ];
@@ -136,7 +136,7 @@ class Streams extends API
         }
 
         if (count($params) < 2) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('No data to update.'),
             ];
@@ -159,7 +159,7 @@ class Streams extends API
             }
             $stream->save();
         } catch (\Exception $e) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream could not be updated.'),
                 'exception' => $e->getMessage(),
@@ -301,7 +301,7 @@ class Streams extends API
         }
 
         if ($streams === null) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Stream not found.'),
             ];
@@ -585,7 +585,7 @@ class Streams extends API
         try {
             $stream->increment('widget_views');
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget loads.'),
             ];
@@ -619,7 +619,7 @@ class Streams extends API
         try {
             $stream->increment('widget_clicks');
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget clicks.'),
             ];

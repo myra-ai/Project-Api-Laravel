@@ -281,7 +281,7 @@ class Metrics extends API
         try {
             $stream->increment('widget_views');
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget loads.'),
             ];
@@ -333,7 +333,7 @@ class Metrics extends API
         try {
             $stream->increment('widget_clicks');
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget clicks.'),
             ];

@@ -102,7 +102,7 @@ class Stories extends API
                 }
             }
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to create story.'),
             ];
@@ -152,16 +152,18 @@ class Stories extends API
 
         $params['title'] = isset($params['title']) ? trim($params['title']) : null;
         $params['media_id'] = isset($params['media_id']) ? trim($params['media_id']) : null;
-        $params['status'] = isset($params['status']) ? strtoupper(trim($params['status'])) : null;
-        $params['publish'] = isset($params['status']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
+        $params['status'] = isset($params['status']) ? trim(strtoupper($params['status'])) : null;
+        $params['publish'] = isset($params['publish']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
 
         try {
             if ($params['title'] !== null) {
                 $story->title = $params['title'];
             }
+
             if ($params['media_id'] !== null) {
                 $story->media_id = $params['media_id'];
             }
+
             if ($params['status'] !== null) {
                 if ($params['status'] === 'ACTIVE') {
                     if ($story->media_id && $params['media_id'] === null) {
@@ -185,22 +187,28 @@ class Stories extends API
 
                 $story->status = $params['status'];
             }
-            if (isset($params['publish'])) {
-                if ($params['publish'] === true) {
-                    if ($params['status'] !== 'ACTIVE' || $story->status !== 'ACTIVE') {
-                        $r->messages[] = (object) [
-                            'type' => 'error',
-                            'message' => __('Story must be active to be published.'),
-                        ];
-                        return response()->json($r, Response::HTTP_BAD_REQUEST);
-                    }
+
+            if ($params['publish'] !== null) {
+                if (
+                    ($params['publish'] === true && $story->status !== 'ACTIVE') ||
+                    ($params['status'] !== null && ($params['publish'] === true && $params['status'] !== 'ACTIVE'))
+                ) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Story must be active to be published.'),
+                        'debug' => [
+                            'status' => $story->status,
+                            'publish' => $params['publish'],
+                        ],
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
 
                 $story->publish = $params['publish'];
             }
             $story->save();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to update story.'),
             ];
@@ -215,15 +223,11 @@ class Stories extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => __('Story updated.'),
+            'message' => __('Story updated successfully.'),
         ];
 
         $r->data = (object) [
-            'id' => $story->id,
-            'title' => $story->title,
-            'media_id' => $story->media_id,
-            'status' => $story->status,
-            'publish' => $story->publish,
+            'updated_at' => now()
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
@@ -351,7 +355,7 @@ class Stories extends API
                 return mStories::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to get story list.'),
             ];

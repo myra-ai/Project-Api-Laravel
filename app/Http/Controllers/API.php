@@ -319,12 +319,12 @@ class API extends Controller
         try {
             $validator = Validator::make(array_merge(...$fields), $rules);
         } catch (\Exception $e) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Could not validate data.'),
             ];
             if (config('app.debug')) {
-                $r->messages[] = [
+                $r->messages[] = (object) [
                     'type' => 'debug',
                     'message' => $e->getMessage(),
                 ];
@@ -333,7 +333,7 @@ class API extends Controller
         }
 
         if ($validator->fails()) {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => $validator->errors()->first(),
             ];
@@ -1194,7 +1194,7 @@ class API extends Controller
                 $file = Storage::disk('public')->get($media->path);
 
                 if ($file === false || $file === null) {
-                    $r->messages[] = [
+                    $r->messages[] = (object) [
                         'type' => 'error',
                         'message' => __('File not found.'),
                     ];

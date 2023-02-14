@@ -111,7 +111,7 @@ class Account extends API
             $company->name = $params['brand_name'];
             $company->save();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to create company.'),
             ];
@@ -139,7 +139,7 @@ class Account extends API
             $company_user->is_master = true;
             $company_user->save();
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to create user account.'),
             ];

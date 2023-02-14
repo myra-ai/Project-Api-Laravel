@@ -31,7 +31,7 @@ class Likes extends API
                 return $story;
             }
         } else {
-            $r->messages[] = [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Invalid stream or story ID.'),
             ];
@@ -53,7 +53,7 @@ class Likes extends API
                 Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(self::CACHE_TIME));
             }
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to add like.'),
             ];
@@ -133,7 +133,7 @@ class Likes extends API
                 }
             }
         } catch (\Exception $e) {
-            $message = [
+            $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to remove like.'),
             ];
