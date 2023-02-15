@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Timestamp;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,7 +14,8 @@ class SwipeGroups extends Authenticatable
     protected $table = 'swipe_groups';
     protected $primaryKey = 'id';
     public $timestamps = true;
-
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+    
     /**
      * The attributes that are mass assignable.
      *
@@ -36,7 +38,12 @@ class SwipeGroups extends Authenticatable
         'id' => 'string',
         'swipe_id' => 'string',
         'story_id' => 'string',
-        'created_at' => 'timestamp',
-        'updated_at' => 'timestamp',
+        'created_at' => Timestamp::class,
+        'updated_at' => Timestamp::class,
     ];
+
+    public function getStory()
+    {
+        return $this->belongsTo(Stories::class, 'story_id', 'id')->first();
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Timestamp;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -35,6 +36,6 @@ class PasswordResets extends Authenticatable
         'email' => 'string',
         'token' => 'string',
         'shorten_code' => 'string',
-        'created_at' => 'timestamp',
+        'created_at' => Timestamp::class,
     ];
 }

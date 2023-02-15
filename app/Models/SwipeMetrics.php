@@ -13,7 +13,8 @@ class SwipeMetrics extends Authenticatable
     protected $table = 'swipe_metrics';
     protected $primaryKey = 'id';
     public $timestamps = false;
-
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+    
     /**
      * The attributes that are mass assignable.
      *

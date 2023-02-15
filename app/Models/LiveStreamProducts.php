@@ -6,7 +6,6 @@ use App\Casts\Base64;
 use App\Http\Controllers\API;
 use App\Jobs\MediaResizer;
 use App\Models\Links;
-use App\Models\LiveStreamMedias;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -69,7 +68,7 @@ class LiveStreamProducts extends Authenticatable
         'deleted_at' => 'timestamp',
     ];
 
-    public function getImages(string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    public function getImages(string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
     {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')->select('media_id')
             ->orderBy($order_by, $order)
@@ -89,7 +88,7 @@ class LiveStreamProducts extends Authenticatable
             });
     }
 
-    public function getImagesDetails(string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    public function getImagesDetails(string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
     {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
             ->orderBy($order_by, $order)
@@ -117,7 +116,7 @@ class LiveStreamProducts extends Authenticatable
             });
     }
 
-    public function getImagesDetailsOptimized(int $width = 256, int $height = 256, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    public function getImagesDetailsOptimized(int $width = 256, int $height = 256, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
     {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
             ->orderBy($order_by, $order)

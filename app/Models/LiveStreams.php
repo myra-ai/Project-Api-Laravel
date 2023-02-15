@@ -82,7 +82,7 @@ class LiveStreams extends Authenticatable
         'clicks' => 'integer',
         'comments' => 'integer',
         'company_id' => 'string',
-        'deleted_at' => 'timestamp',
+        'deleted_at' => Timestamp::class,
         'dislikes' => 'integer',
         'duration' => 'integer',
         'latency_mode' => 'string',
@@ -99,6 +99,8 @@ class LiveStreams extends Authenticatable
         'thumbnail_id' => 'string',
         'title' => Base64::class,
         'views' => 'integer',
+        'created_at' => Timestamp::class,
+        'updated_at' => Timestamp::class,
     ];
 
     public function getLatestStreamID(string $company_id)

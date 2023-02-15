@@ -18,7 +18,7 @@ return new class extends Migration
             $table->uuid('company_id')->nullable()->default(null);
             $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
             $table->string('title', 255)->nullable()->default(null);
-            $table->string('status', 16)->nullable()->default(null);
+            $table->tinyInteger('status')->default(0);
             $table->boolean('published')->default(false);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
             $table->timestamps(6);

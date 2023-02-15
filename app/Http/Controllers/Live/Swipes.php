@@ -8,8 +8,7 @@ use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Str;
-use Ramsey\Uuid\Uuid;
+use Illuminate\Support\Facades\Cache;
 
 class Swipes extends API
 {
@@ -19,7 +18,7 @@ class Swipes extends API
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
             'title' => ['required', 'string', 'max:60'],
-            'status' => ['nullable', 'string', 'in:archived,draft,published'],
+            'status' => ['nullable', 'string', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:stories,id'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
@@ -27,7 +26,14 @@ class Swipes extends API
         }
 
         $params['title'] = isset($params['title']) ? trim($params['title']) : null;
-        $params['status'] = isset($params['status']) ? trim($params['status']) : 'draft';
+        $params['status'] = isset($params['status']) ? match (strtolower(trim($params['status']))) {
+            '0', 'draft' => API::SWIPE_STATUS_DRAFT,
+            '1', 'ready' => API::SWIPE_STATUS_READY,
+            '2', 'active' => API::SWIPE_STATUS_ACTIVE,
+            '3', 'archived' => API::SWIPE_STATUS_ARCHIVED,
+            default => API::SWIPE_STATUS_DRAFT,
+        }
+            : API::SWIPE_STATUS_DRAFT;
 
         try {
             $swipes = new mSwipes();
@@ -48,6 +54,9 @@ class Swipes extends API
             'type' => 'success',
             'message' => 'Swipe created',
         ];
+        $r->data = (object) [
+            'id' => $swipes->id,
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
@@ -57,8 +66,8 @@ class Swipes extends API
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
-            'title' => ['required', 'string', 'max:60'],
-            'status' => ['nullable', 'string', 'in:archived,draft,published'],
+            'title' => ['nullable', 'string', 'max:60'],
+            'status' => ['nullable', 'string', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;
@@ -69,11 +78,36 @@ class Swipes extends API
         }
 
         $params['title'] = isset($params['title']) ? trim($params['title']) : null;
-        $params['status'] = isset($params['status']) ? trim($params['status']) : null;
-        $params['published'] = isset($params['status']) ? trim($params['status']) : null;
+        $params['status'] = isset($params['status']) ? match (strtolower(trim($params['status']))) {
+            '0', 'draft' => API::SWIPE_STATUS_DRAFT,
+            '1', 'ready' => API::SWIPE_STATUS_READY,
+            '2', 'active' => API::SWIPE_STATUS_ACTIVE,
+            '3', 'archived' => API::SWIPE_STATUS_ARCHIVED,
+            default => API::SWIPE_STATUS_DRAFT,
+        }
+            : null;
+        $params['published'] = isset($params['published']) ? filter_var($params['published'], FILTER_VALIDATE_BOOLEAN) : null;
+
+        $cache_tag = 'swipe_' . $params['swipe_id'];
 
         try {
-            $swipe->updateSwipe($params);
+            $message = null;
+            $updated_swipe = $swipe->updateSwipe($params, $message);
+            if ($updated_swipe === null) {
+                $r->messages[] = (object) [
+                    'type' => 'warning',
+                    'message' => 'No changes made',
+                ];
+                return response()->json($r, Response::HTTP_OK);
+            } else if ($updated_swipe === false) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => $message !== null ? $message : 'Could not update swipe',
+                ];
+                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+            } else {
+                Cache::forget($cache_tag);
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -88,7 +122,7 @@ class Swipes extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => 'Swipe created',
+            'message' => 'Swipe updated successfully',
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
@@ -108,7 +142,15 @@ class Swipes extends API
         }
 
         try {
-            $swipe->deleteSwipe($params['swipe_id']);
+            Cache::forget('swipe_' . $params['swipe_id']);
+            if (!$swipe->deleteSwipe($params['swipe_id'])) {
+                $message = (object) [
+                    'type' => 'error',
+                    'message' => 'Swipe already deleted',
+                ];
+                $r->messages[] = $message;
+                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -123,26 +165,72 @@ class Swipes extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => 'Swipe deleted',
+            'message' => 'Swipe deleted successfully',
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
 
-
     public function getListByCompanyId(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'order_by' => ['nullable', 'string', 'in:created_at,updated_at'],
+            'order' => ['nullable', 'string', 'in:asc,desc'],
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:80'],
+            'show_attached' => ['nullable', new strBoolean],
+            'attached_detailed' => ['nullable', new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
 
-        if (($swipes = API::getSwipes($params['company_id'], $r)) instanceof JsonResponse) {
+        $params['show_attached'] = isset($params['show_attached']) ? filter_var($params['show_attached'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['attached_detailed'] = isset($params['attached_detailed']) ? filter_var($params['attached_detailed'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
+
+        if (($swipes = API::getSwipes($params['company_id'], $r, $params)) instanceof JsonResponse) {
             return $swipes;
         }
 
-        $r->data = $swipes;
+        $cache_tag = 'swipes_' . $params['company_id'];
+        $cache_tag .= implode('_', $params);
+
+        $data = [];
+
+        try {
+            $data = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_SWIPES), function () use ($swipes, $params) {
+                return $swipes->map(function ($swipe) use ($params) {
+                    $swipe->makeHidden(['company_id', 'updated_at', 'deleted_at']);
+                    if ($params['token'] === null) {
+                        $swipe->makeHidden('created_at');
+                    }
+                    if ($params['show_attached']) {
+                        $swipe->stories = match ($params['attached_detailed']) {
+                            true => $swipe->getAttachedStoriesDetailed(),
+                            default => $swipe->getAttachedStories()->map(function ($story) {
+                                $story->makeHidden(['swipe_id', 'created_at', 'updated_at']);
+                                return $story;
+                            })
+                        };
+                    }
+                    return $swipe;
+                });
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => 'Could not get swipes',
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->data = $data;
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
@@ -151,6 +239,8 @@ class Swipes extends API
     {
         if (($params = API::doValidate($r, [
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'show_attached' => ['nullable', new strBoolean],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -159,7 +249,21 @@ class Swipes extends API
             return $swipe;
         }
 
-        $r->data = $swipe;
+        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
+
+        if ($params['token'] === null) {
+            $r->data = $swipe->makeHidden(['company_id', 'created_at', 'updated_at', 'deleted_at']);
+        } else {
+            $swipe->makeHidden(['company_id', 'updated_at', 'deleted_at']);
+            if ($params['show_attached']) {
+                $swipe->stories = $swipe->getAttachedStories()->map(function ($story) {
+                    $story->makeHidden(['swipe_id', 'created_at', 'updated_at']);
+                    return $story;
+                });
+            }
+            $r->data = $swipe;
+        }
+
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
@@ -181,7 +285,20 @@ class Swipes extends API
         }
 
         try {
-            $swipe->attachStory($params);
+            if ($swipe->countAttachedStories() >= config('livestream.max_swipe_stories')) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => 'This swipe already has the maximum number of stories attached',
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+            if (!$swipe->attachStory($params)) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => 'This story is already attached to this swipe',
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -219,11 +336,17 @@ class Swipes extends API
         }
 
         try {
-            $swipe->detachStory($params);
+            if (!$swipe->detachStory($params)) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => 'This story is not attached to this swipe',
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
-                'message' => 'Could not attach story to swipe',
+                'message' => 'Could not detach story from swipe',
             ];
             if (config('app.debug')) {
                 $message->debug = $e->getMessage();
@@ -234,7 +357,7 @@ class Swipes extends API
 
         $r->messages[] = (object) [
             'type' => 'success',
-            'message' => 'Story attached to swipe',
+            'message' => 'Story detached from swipe',
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);

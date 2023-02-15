@@ -15,7 +15,8 @@ class Stories extends Authenticatable
     protected $table = 'stories';
     protected $primaryKey = 'id';
     public $timestamps = true;
-
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+    
     /**
      * The attributes that are mass assignable.
      *
@@ -77,7 +78,7 @@ class Stories extends Authenticatable
         'deleted_at' => 'timestamp',
     ];
 
-    public function getSource(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 1)
+    public function getSource(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 1)
     {
         $source = $this->hasOne(LiveStreamMedias::class, 'id', 'media_id')
             ->orderBy($order_by, $order)
@@ -99,7 +100,7 @@ class Stories extends Authenticatable
         ];
     }
 
-    public function getThumbnail(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 1)
+    public function getThumbnail(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 1)
     {
         $thumbnail = $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')
             ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)
@@ -122,7 +123,7 @@ class Stories extends Authenticatable
         ];
     }
 
-    public function getThumbnailOptimized(int $width = 512, int $height = 512, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'created_at', $order = 'asc', int $offset = 0)
+    public function getThumbnailOptimized(int $width = 512, int $height = 512, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'created_at', string $order = 'asc', int $offset = 0)
     {
         $thumbnail = $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')
             ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)
@@ -157,7 +158,7 @@ class Stories extends Authenticatable
         ];
     }
 
-    public function getThumbnails(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    public function getThumbnails(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 30)
     {
         $thumbnails = $this->hasMany(LiveStreamMedias::class, 'parent_id', 'media_id')
             ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)

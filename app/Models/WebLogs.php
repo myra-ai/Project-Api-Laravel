@@ -14,7 +14,8 @@ class WebLogs extends Authenticatable
     protected $primaryKey = 'id';
     public $timestamps = false;
     public $connection = 'web_logs';
-
+    protected $dateFormat = 'Y-m-d H:i:s.u';
+    
     /**
      * The attributes that are mass assignable.
      *

@@ -65,6 +65,12 @@ class API extends Controller
     const STORY_NOT_PUBLISHED = 0;
     const STORY_PUBLISHED = 1;
 
+    const SWIPE_STATUS_DRAFT = 0;
+    const SWIPE_STATUS_READY = 1;
+    const SWIPE_STATUS_ACTIVE = 2;
+    const SWIPE_STATUS_ARCHIVED = 3;
+    const SWIPE_STATUS_DELETED = 4;
+
     const COUNT_CREATE_THUMBNAIL = 3;
 
     const MEDIA_RAW_BY_ID_URL = '/media/raw/id/';
@@ -470,7 +476,7 @@ class API extends Controller
      * 
      * @return object
      */
-    public static function getSwipes(string $company_id, ?object &$r = null): JsonResponse|Collection
+    public static function getSwipes(string $company_id, ?object &$r = null, array $params = []): JsonResponse|Collection
     {
         $r = $r ?? self::INIT();
 
@@ -478,9 +484,9 @@ class API extends Controller
         $swipes = null;
 
         try {
-            $swipes = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_SWIPES), function () use ($company_id) {
+            $swipes = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_SWIPES), function () use ($company_id, $params) {
                 $swipes = new mSwipes();
-                return $swipes->getSwipesByCompanyId($company_id);
+                return $swipes->getSwipesByCompanyId($company_id, $params['order_by'] ?? 'created_at', $params['order'] ?? 'asc', $params['offset'] ?? 0, $params['limit'] ?? 80);
             });
         } catch (\Exception $e) {
             $message = (object) [

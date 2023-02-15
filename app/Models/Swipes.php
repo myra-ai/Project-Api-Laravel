@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\Timestamp;
+use App\Http\Controllers\API;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -14,6 +17,7 @@ class Swipes extends Authenticatable
     protected $table = 'swipes';
     protected $primaryKey = 'id';
     public $timestamps = true;
+    protected $dateFormat = 'Y-m-d H:i:s.u';
 
     /**
      * The attributes that are mass assignable.
@@ -40,14 +44,14 @@ class Swipes extends Authenticatable
         'id' => 'string',
         'company_id' => 'string',
         'title' => 'string',
-        'status' => 'string',
+        'status' => 'integer',
         'published' => 'boolean',
-        'deleted_at' => 'timestamp',
-        'created_at' => 'timestamp',
-        'updated_at' => 'timestamp',
+        'deleted_at' => Timestamp::class,
+        'created_at' => Timestamp::class,
+        'updated_at' => Timestamp::class,
     ];
 
-    public function getSwipesByCompanyId(string $swipe_id, string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    public function getSwipesByCompanyId(string $swipe_id, string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 80): Collection
     {
         return $this->where('company_id', '=', $swipe_id)
             ->where('deleted_at', '=', null)
@@ -57,7 +61,7 @@ class Swipes extends Authenticatable
             ->get();
     }
 
-    public function getSwipeById(string $swipe_id, string $order_by = 'created_at', $order = 'asc', int $offset = 0)
+    public function getSwipeById(string $swipe_id, string $order_by = 'created_at', string $order = 'asc', int $offset = 0): ?Swipes
     {
         return $this->where('id', '=', $swipe_id)
             ->where('deleted_at', '=', null)
@@ -66,7 +70,7 @@ class Swipes extends Authenticatable
             ->first();
     }
 
-    public function createSwipe(array $params): bool
+    public function createSwipe(array $params): Swipes
     {
         return $this->create([
             'id' => Str::uuid()->toString(),
@@ -74,20 +78,36 @@ class Swipes extends Authenticatable
             'title' => $params['title'],
             'status' => $params['status'],
             'published' => false,
-        ]);
+        ])->fresh();
     }
 
-    public function updateSwipe(array $params): bool
+    public function updateSwipe(array $params, ?string &$message = null): ?bool
     {
         $update = [];
-        if ($params['title'] !== null) {
+        if ($params['title'] !== null && $params['title'] !== $this->title) {
             $update['title'] = $params['title'];
         }
-        if ($params['status'] !== null) {
+        if ($params['status'] !== null && $params['status'] !== $this->status) {
             $update['status'] = $params['status'];
+            if ($params['status'] === API::SWIPE_STATUS_READY) {
+                $update['published'] = false;
+            }
         }
-        if ($params['published'] !== null) {
+        if ($params['published'] !== null && $params['published'] !== $this->published) {
+            if ($params['published']) {
+                $update['status'] = API::SWIPE_STATUS_ACTIVE;
+            } else {
+                $update['status'] = API::SWIPE_STATUS_READY;
+            }
+            if ($params['published'] && $this->status !== API::SWIPE_STATUS_READY) {
+                $message = __('Swipe is not ready to be published');
+                return false;
+            }
             $update['published'] = $params['published'];
+        }
+
+        if (count($update) === 0) {
+            return null;
         }
 
         return $this->where('id', '=', $params['swipe_id'])
@@ -104,27 +124,73 @@ class Swipes extends Authenticatable
             ]);
     }
 
+    public function countAttachedStories(): int
+    {
+        return SwipeGroups::where('swipe_id', '=', $this->id)->count();
+    }
+
     public function attachStory(array $params): bool
     {
+        if (SwipeGroups::where('swipe_id', '=', $params['swipe_id'])
+            ->where('story_id', '=', $params['story_id'])
+            ->exists()
+        ) {
+            return false;
+        }
         try {
             SwipeGroups::create([
                 'id' => Str::uuid()->toString(),
                 'swipe_id' => $params['swipe_id'],
                 'story_id' => $params['story_id'],
             ]);
+
+            if ($this->status === API::SWIPE_STATUS_DRAFT) {
+                $this->status = API::SWIPE_STATUS_READY;
+                $this->save();
+            }
         } catch (\Exception $e) {
             if ($e->getCode() === '23000') {
                 return false;
             }
             throw $e;
         }
+
         return true;
     }
 
     public function detachStory(array $params): bool
     {
-        return SwipeGroups::where('swipe_id', '=', $params['swipe_id'])
+        if (SwipeGroups::where('swipe_id', '=', $params['swipe_id'])
             ->where('story_id', '=', $params['story_id'])
-            ->delete();
+            ->delete()
+        ) {
+            if ($this->status === API::SWIPE_STATUS_READY) {
+                $this->status = API::SWIPE_STATUS_DRAFT;
+                $this->save();
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getAttachedStories(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 30): Collection
+    {
+        return SwipeGroups::where('swipe_id', '=', $this->id)
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getAttachedStoriesDetailed(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 30): object
+    {
+        return SwipeGroups::where('swipe_id', '=', $this->id)
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get()->map(function ($item) {
+                return API::story($item->getStory());
+            });
     }
 }
