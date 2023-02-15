@@ -285,7 +285,7 @@ class Streams extends API
                 default => throw new \Exception('Invalid token')
             };
 
-            $streams_count = (int) Cache::remember('streams_company_count_' . $params['company_id'], now()->addSeconds(API::CACHE_TIME), function () use ($params) {
+            $streams_count = (int) Cache::remember('streams_company_count_' . $params['company_id'], now()->addSeconds(API::CACHE_TTL), function () use ($params) {
                 return mLiveStreams::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
@@ -520,139 +520,6 @@ class Streams extends API
             'viewers' => $stream->viewers,
         ];
 
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function getMetrics(Request $request, ?string $stream_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
-
-        $r->data = (object) [
-            'viewers' => $stream->viewers,
-            'likes' => $stream->likes,
-            'dislikes' => $stream->dislikes,
-            'comments' => $stream->comments,
-            'widget_views' => $stream->widget_views,
-            'widget_clicks' => $stream->widget_clicks,
-        ];
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function streamMetricWidgetViews(Request $request, ?string $stream_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
-
-        $r->data = (object) [
-            'widget_views' => $stream->widget_views
-        ];
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function streamAddMetricWidgetViews(Request $request, ?string $stream_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
-
-        try {
-            $stream->increment('widget_views');
-        } catch (\Exception $e) {
-            $message = (object)[
-                'type' => 'error',
-                'message' => __('Failed to add live stream widget loads.'),
-            ];
-            if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $r->data = (object) [
-            'widget_views' => $stream->widget_views
-        ];
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function streamAddMetricWidgetClicks(Request $request, ?string $stream_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
-
-        try {
-            $stream->increment('widget_clicks');
-        } catch (\Exception $e) {
-            $message = (object)[
-                'type' => 'error',
-                'message' => __('Failed to add live stream widget clicks.'),
-            ];
-            if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        $r->data = (object) [
-            'widget_clicks' => $stream->widget_clicks
-        ];
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function streamMetricWidgetClicks(Request $request, ?string $stream_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-        ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($stream = API::getLiveStream($r, $params['stream_id'])) instanceof JsonResponse) {
-            return $stream;
-        }
-
-        $r->data = (object) [
-            'widget_clicks' => $stream->widget_clicks
-        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

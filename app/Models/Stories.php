@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Http\Controllers\API;
+use App\Jobs\MediaResizer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -76,13 +77,108 @@ class Stories extends Authenticatable
         'deleted_at' => 'timestamp',
     ];
 
-    public function getSource()
+    public function getSource(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 1)
     {
-        return $this->hasOne(LiveStreamMedias::class, 'id', 'media_id')->first();
+        $source = $this->hasOne(LiveStreamMedias::class, 'id', 'media_id')
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->first();
+
+        if ($source === null) {
+            return null;
+        }
+
+        return (object) [
+            'id' => $source->id,
+            'alt' => $source->alt ?? null,
+            'mime' => $source->mime ?? null,
+            'width' => $source->width ?? null,
+            'height' => $source->height ?? null,
+            'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
+        ];
     }
 
-    public function getThumbnail()
+    public function getThumbnail(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 1)
     {
-        return $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)->first();
+        $thumbnail = $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')
+            ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->first();
+
+        if ($thumbnail === null) {
+            return null;
+        }
+
+        return (object) [
+            'id' => $thumbnail->id,
+            'alt' => $thumbnail->alt ?? null,
+            'mime' => $thumbnail->mime ?? null,
+            'width' => $thumbnail->width ?? null,
+            'height' => $thumbnail->height ?? null,
+            'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
+        ];
+    }
+
+    public function getThumbnailOptimized(int $width = 512, int $height = 512, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'created_at', $order = 'asc', int $offset = 0)
+    {
+        $thumbnail = $this->hasOne(LiveStreamMedias::class, 'parent_id', 'media_id')
+            ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->first();
+
+        if ($thumbnail === null) {
+            return null;
+        }
+
+        if (($optimized = API::mediaSized($thumbnail->id, $width, $height, $order_by, $order, $offset)) === null) {
+            MediaResizer::dispatch($thumbnail->id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur);
+        } else {
+            return (object) [
+                'id' => $optimized->id,
+                'alt' => $thumbnail->alt ?? null,
+                'mime' => $thumbnail->mime ?? null,
+                'width' => $optimized->width ?? null,
+                'height' => $optimized->height ?? null,
+                'url' => $optimized->s3_available !== null ? API::getMediaCdnUrl($optimized->path) : API::getMediaUrl($optimized->id),
+            ];
+        }
+
+        return (object) [
+            'id' => $thumbnail->id,
+            'alt' => $thumbnail->alt ?? null,
+            'mime' => $thumbnail->mime ?? null,
+            'width' => $thumbnail->width ?? null,
+            'height' => $thumbnail->height ?? null,
+            'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
+        ];
+    }
+
+    public function getThumbnails(string $order_by = 'created_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    {
+        $thumbnails = $this->hasMany(LiveStreamMedias::class, 'parent_id', 'media_id')
+            ->where('type', '=', API::MEDIA_TYPE_IMAGE_THUMBNAIL)
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+
+        if ($thumbnails === null) {
+            return null;
+        }
+
+        return $thumbnails->map(function ($thumbnail) {
+            return (object) [
+                'id' => $thumbnail->id,
+                'alt' => $thumbnail->alt ?? null,
+                'mime' => $thumbnail->mime ?? null,
+                'width' => $thumbnail->width ?? null,
+                'height' => $thumbnail->height ?? null,
+                'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
+            ];
+        });
     }
 }

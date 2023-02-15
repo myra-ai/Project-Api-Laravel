@@ -116,7 +116,7 @@ class Account extends API
                 'message' => __('Failed to create company.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = [
+                $message->debug = (object)[
                     'message' => $e->getMessage(),
                 ];
             }
@@ -144,7 +144,7 @@ class Account extends API
                 'message' => __('Failed to create user account.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = [
+                $message->debug = (object)[
                     'message' => $e->getMessage(),
                 ];
             }
@@ -210,13 +210,13 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$company_user->hasVerifiedEmail()) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Email address is not verified.'),
-            ];
-            return response()->json($r, Response::HTTP_UNAUTHORIZED);
-        }
+        // if (!$company_user->hasVerifiedEmail()) {
+        //     $r->messages[] = (object) [
+        //         'type' => 'error',
+        //         'message' => __('Email address is not verified.'),
+        //     ];
+        //     return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        // }
 
         if (!Hash::check($params['password'], $company_user->password)) {
             $r->messages[] = (object) [
@@ -319,21 +319,6 @@ class Account extends API
         $token = Str::random(40);
 
         try {
-            Mail::to($company_user->email)->send(new ResetPassword($company_user, $token));
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to send email.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-
-        try {
             $reset = new mPasswordResets();
             $reset->email = $company_user->email;
             $reset->token = $token;
@@ -344,6 +329,20 @@ class Account extends API
             $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to reset password.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        try {
+            Mail::to($company_user->email)->send(new ResetPassword($company_user, $token));
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to send email.'),
             ];
             if (config('app.debug')) {
                 $message->debug = $e->getMessage();
@@ -414,6 +413,9 @@ class Account extends API
                 'type' => 'error',
                 'message' => __('Failed to reset password.'),
             ];
+            if (config('app.debug')) {
+                $r->messages[0]->debug = $e->getMessage();
+            }
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
@@ -523,7 +525,7 @@ class Account extends API
         $params['order_by'] = $params['order_by'] ?? 'id';
         $params['order'] = $params['order'] ?? 'asc';
 
-        $total = Cache::remember('company_users_total_' . $company->id, self::CACHE_TIME, function () use ($company) {
+        $total = Cache::remember('company_users_total_' . $company->id, API::CACHE_TTL, function () use ($company) {
             return $company->users()->count();
         });
 

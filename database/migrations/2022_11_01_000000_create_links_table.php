@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('links', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->longText('url');
+            $table->text('url');
             $table->bigInteger('clicks')->default(0);
             $table->uuid('checksum')->unique();
             $table->timestamp('deleted_at', 6)->nullable()->default(null);

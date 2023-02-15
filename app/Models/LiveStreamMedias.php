@@ -24,12 +24,15 @@ class LiveStreamMedias extends Authenticatable
      */
     protected $fillable = [
         'id',
+        'parent_id',
         'checksum',
         'original_name',
+        'hash',
         'original_url',
         'path',
         's3_available',
         'is_blurred',
+        'is_resized',
         'policy',
         'type',
         'mime',
@@ -38,10 +41,11 @@ class LiveStreamMedias extends Authenticatable
         'width',
         'height',
         'duration',
-        'description',
-        'tags',
+        'bitrate',
+        'framerate',
+        'channels',
         'alt',
-        'parent_id',
+        'legend',
         'deleted_at',
     ];
 
@@ -52,11 +56,14 @@ class LiveStreamMedias extends Authenticatable
      */
     protected $casts = [
         'id' => 'string',
+        'parent_id' => 'string',
         'checksum' => 'string',
         'original_name' => 'string',
+        'hash' => 'string',
         'original_url' => Base64::class,
         'path' => 'string',
         'is_blurred' => 'boolean',
+        'is_resized' => 'boolean',
         'policy' => 'string',
         'type' => 'integer',
         'mime' => 'string',
@@ -64,10 +71,12 @@ class LiveStreamMedias extends Authenticatable
         'size' => 'integer',
         'width' => 'integer',
         'height' => 'integer',
-        'duration' => 'integer',
-        'description' => Base64::class,
+        'duration' => 'float',
+        'bitrate' => 'float',
+        'framerate' => 'float',
+        'channels' => 'string',
         'alt' => Base64::class,
-        'parent_id' => 'string',
+        'legend' => Base64::class,
         'deleted_at' => 'datetime',
     ];
 

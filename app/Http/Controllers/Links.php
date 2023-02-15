@@ -29,7 +29,7 @@ class Links extends API
                 'message' => __('Failed to redirect link.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = [
+                $message->debug = (object)[
                     'message' => $e->getMessage(),
                 ];
             }

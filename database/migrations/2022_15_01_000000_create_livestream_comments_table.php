@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreign('stream_id')->references('id')->on('livestreams')->onDelete('cascade');
             $table->uuid('story_id')->nullable()->default(null)->index();
             $table->foreign('story_id')->references('id')->on('stories')->onDelete('cascade');
-            $table->longText('text');
+            $table->text('text');
             $table->string('name', 255);
             $table->string('email', 255)->index();
             $table->bigInteger('parent_id')->unsigned()->nullable()->index();

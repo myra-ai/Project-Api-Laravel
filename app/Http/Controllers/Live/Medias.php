@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Live;
 
 use App\Http\Controllers\API;
+use App\Jobs\SyncWithS3;
 use App\Rules\strBoolean;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ class Medias extends API
             return $params;
         }
 
-        if (($media = API::getMedia($r, $params['media_id'])) instanceof JsonResponse) {
+        if (($media = API::getMedia($params['media_id'], $r)) instanceof JsonResponse) {
             return $media;
         }
 
@@ -125,7 +126,7 @@ class Medias extends API
             return $params;
         }
 
-        if (($media = API::getMedia($r, $media_id)) instanceof JsonResponse) {
+        if (($media = API::getMedia($media_id, $r)) instanceof JsonResponse) {
             return $media;
         }
 
@@ -142,16 +143,20 @@ class Medias extends API
             return $params;
         }
 
-        if (($media = API::getMedia($r, $media_id)) instanceof JsonResponse) {
+        if (($media = API::getMedia($media_id, $r)) instanceof JsonResponse) {
             return $media;
         }
 
-        if (($cdn = API::doSyncMediaWithCDN($media, $r)) instanceof JsonResponse) {
-            return $cdn;
+        if ($media->deleted_at !== null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('File not found.'),
+            ];
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
-        if ($cdn !== false) {
-            return redirect()->away($cdn);
+        if ($media->s3_available === null) {
+            SyncWithS3::dispatch($media);
         }
 
         $file = Storage::disk('public')->get($media->path);
@@ -167,7 +172,7 @@ class Medias extends API
         return response($file, Response::HTTP_OK, [
             'Content-Type' => $media->mime,
             'Content-Length' => $media->size,
-            'Content-Disposition' => 'inline; filename="' . $media->original_name . '"',
+            'Content-Disposition' => 'inline; filename="' . $media->hash . '.' . $media->extension . '"',
         ]);
     }
 
@@ -179,8 +184,20 @@ class Medias extends API
             return $params;
         }
 
-        if (($media = API::getMedia($r, $media_id)) instanceof JsonResponse) {
+        if (($media = API::getMedia($media_id, $r)) instanceof JsonResponse) {
             return $media;
+        }
+
+        if ($media->deleted_at !== null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('File not found.'),
+            ];
+            return response()->json($r, Response::HTTP_NOT_FOUND);
+        }
+
+        if ($media->s3_available === null) {
+            SyncWithS3::dispatch($media);
         }
 
         $thumbnail = $media->getThumbnail();
@@ -191,14 +208,6 @@ class Medias extends API
                 'message' => __('Thumbnail not found.'),
             ];
             return response()->json($r, Response::HTTP_NOT_FOUND);
-        }
-
-        if (($cdn = API::doSyncMediaWithCDN($thumbnail, $r)) instanceof JsonResponse) {
-            return $cdn;
-        }
-
-        if ($cdn !== false) {
-            return redirect()->away($cdn);
         }
 
         $file = Storage::disk('public')->get($thumbnail->path);
@@ -214,7 +223,7 @@ class Medias extends API
         return response($file, Response::HTTP_OK, [
             'Content-Type' => $thumbnail->mime,
             'Content-Length' => $thumbnail->size,
-            'Content-Disposition' => 'inline; filename="' . $thumbnail->original_name . '"',
+            'Content-Disposition' => 'inline; filename="' . $media->hash . '.' . $media->extension . '"',
         ]);
     }
 
@@ -245,5 +254,25 @@ class Medias extends API
             'Content-Length' => $media->size,
             'Content-Disposition' => 'inline; filename="' . $media->original_name . '"',
         ]);
+    }
+
+    public function doOptimizeMedia(Request $request, ?string $media_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'media_id' => ['required', 'string', 'min:4', 'max:400'],
+        ], $request->all(), ['media_id' => $media_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        if (($media = API::getMedia($media_id, $r)) instanceof JsonResponse) {
+            return $media;
+        }
+
+        $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 96;
+        $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 96;
+        $params['thumbnail_mode'] = isset($params['thumbnail_mode']) ? $params['thumbnail_mode'] : 'fit';
+        $params['thumbnail_keep_asp_ratio'] = isset($params['thumbnail_keep_asp_ratio']) ? filter_var($params['thumbnail_keep_asp_ratio'], FILTER_VALIDATE_BOOLEAN) : true;
+        $params['thumbnail_quality'] = isset($params['thumbnail_quality']) ? intval($params['thumbnail_quality']) : 80;
+        $params['thumbnail_blur'] = isset($params['thumbnail_blur']) ? filter_var($params['thumbnail_blur'], FILTER_VALIDATE_BOOLEAN) : false;
     }
 }

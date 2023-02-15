@@ -31,12 +31,6 @@ Route::delete('/stream/{stream_id}', [L\Streams::class, 'doDelete']);
 
 Route::get('/stream/rtmp/{stream_id}', [L\Streams::class, 'getRTMP']);
 
-Route::get('/stream/metrics/{stream_id}', [L\Streams::class, 'getMetrics']);
-Route::get('/stream/{live_id}/metric/widget/loads', [L\Streams::class, 'streamMetricWidgetLoads']);
-Route::post('/stream/{live_id}/metric/widget/loads', [L\Streams::class, 'streamAddMetricWidgetLoads']);
-Route::get('/stream/{live_id}/metric/widget/clicks', [L\Streams::class, 'streamMetricWidgetClicks']);
-Route::post('/stream/{live_id}/metric/widget/clicks', [L\Streams::class, 'streamAddMetricWidgetClicks']);
-
 Route::post('/story/{company_id}', [L\Stories::class, 'doCreate']);
 Route::get('/stories/{company_id}', [L\Stories::class, 'getByStoryCompanyID']);
 Route::get('/story/swipe/{storie_id}', [L\Stories::class, 'storieList']);
@@ -82,12 +76,12 @@ Route::post('/media/{company_id}', [L\Medias::class, 'doUploadMediaByFile']);
 Route::post('/media/url/{company_id}', [L\Medias::class, 'doUploadMediaByUrl']);
 Route::delete('/media/{media_id}', [L\Medias::class, 'doDeleteMedia']);
 Route::get('/media/{media_id}', [L\Medias::class, 'getMediaByID']);
+Route::post('/media/{media_id}/optimize', [L\Medias::class, 'doOptimizeMedia']);
 Route::get('/media/raw/id/{media_id}', [L\Medias::class, 'getMediaRawByID']);
 Route::get('/media/raw/thumbnail/{media_id}', [L\Medias::class, 'getThumbnailRawByMediaID']);
 Route::get('/media/raw/{path}', [L\Medias::class, 'getMediaRawByPath'])->where('path', '.*');
 
-Route::get('/widget/{company_id}/stream', [L\Widget::class, 'getWidgetStream']);
-Route::get('/widget/{company_id}/story', [L\Widget::class, 'getWidgetStory']);
+Route::get('/widget/{company_id}', [L\Widget::class, 'getWidget']);
 
 Route::post('/account/create', [C\Account::class, 'doCreate']);
 Route::post('/account/login', [C\Account::class, 'doLogin']);

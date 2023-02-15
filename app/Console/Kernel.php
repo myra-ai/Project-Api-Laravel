@@ -23,7 +23,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command(DeployLogs::class)->everyTenMinutes();
         $schedule->command(removeTokensExpired::class)->everyTenMinutes();
-        $schedule->command(MediaWithS3::class)->everyFiveMinutes();
+        $schedule->command(MediaWithS3::class)->everyThirtyMinutes();
         $schedule->command(AssetsWithS3::class)->everyFiveMinutes();
     }
 

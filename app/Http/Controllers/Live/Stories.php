@@ -107,7 +107,7 @@ class Stories extends API
                 'message' => __('Failed to create story.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = [
+                $message->debug = (object)[
                     'message' => $e->getMessage(),
                 ];
             }
@@ -142,6 +142,7 @@ class Stories extends API
             'media_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
             'status' => ['nullable', 'string', 'in:draft,active,deleted'],
             'publish' => ['nullable', new strBoolean],
+            'get_story' => ['nullable', new StrBoolean],
         ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -154,6 +155,7 @@ class Stories extends API
         $params['media_id'] = isset($params['media_id']) ? trim($params['media_id']) : null;
         $params['status'] = isset($params['status']) ? trim(strtoupper($params['status'])) : null;
         $params['publish'] = isset($params['publish']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
+        $params['get_story'] = isset($params['get_story']) ? filter_var($params['get_story'], FILTER_VALIDATE_BOOLEAN) : false;
 
         try {
             if ($params['title'] !== null) {
@@ -213,7 +215,7 @@ class Stories extends API
                 'message' => __('Failed to update story.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = [
+                $message->debug = (object)[
                     'message' => $e->getMessage(),
                 ];
             }
@@ -226,9 +228,16 @@ class Stories extends API
             'message' => __('Story updated successfully.'),
         ];
 
-        $r->data = (object) [
-            'updated_at' => now()
-        ];
+        $r->data = new \stdClass;
+        if ($params['get_story']) {
+            $story->refresh();
+            $r->data = $story;
+            $r->data->title = $params['title'] !== null ? $params['title'] : $story->title;
+            $r->data->thumbnail = $story->getThumbnail();
+            $r->data->id = $story_id;
+        }
+
+        $r->data->updated_at = now();
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }
@@ -256,7 +265,7 @@ class Stories extends API
                 'message' => __('Failed to delete story.'),
             ];
             if (env('APP_DEBUG', false)) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
         }
@@ -282,6 +291,12 @@ class Stories extends API
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:viewers,views,comments,clicks,opens,status,publish,created_at'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
+            'thumbnail_width' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'thumbnail_height' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'thumbnail_mode' => ['nullable', 'string', 'in:fit,resize,crop'],
+            'thumbnail_keep_asp_ratio' => ['nullable', new strBoolean],
+            'thumbnail_quality' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'thumbnail_blur' => ['nullable', new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -291,6 +306,12 @@ class Stories extends API
         $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
         $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
         $params['only_published'] = isset($params['only_published']) ? filter_var($params['only_published'], FILTER_VALIDATE_BOOLEAN) : true;
+        $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 96;
+        $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 96;
+        $params['thumbnail_mode'] = isset($params['thumbnail_mode']) ? $params['thumbnail_mode'] : 'fit';
+        $params['thumbnail_keep_asp_ratio'] = isset($params['thumbnail_keep_asp_ratio']) ? filter_var($params['thumbnail_keep_asp_ratio'], FILTER_VALIDATE_BOOLEAN) : true;
+        $params['thumbnail_quality'] = isset($params['thumbnail_quality']) ? intval($params['thumbnail_quality']) : 80;
+        $params['thumbnail_blur'] = isset($params['thumbnail_blur']) ? filter_var($params['thumbnail_blur'], FILTER_VALIDATE_BOOLEAN) : false;
 
         $stories_count = 0;
         $stories = [];
@@ -305,7 +326,7 @@ class Stories extends API
                 $params['order'],
             ]);
 
-            $stories = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TIME), function () use ($params) {
+            $stories = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($params) {
                 return mStories::where('company_id', '=', $params['company_id'])
                     ->where('deleted_at', '=', null)
                     ->when($params['only_published'], function ($query) {
@@ -314,34 +335,12 @@ class Stories extends API
                     ->orderBy($params['order_by'], $params['order'])
                     ->offset($params['offset'])
                     ->limit($params['limit'])
-                    ->get()->map(function ($story) {
-                        $source = $story->getSource();
-                        $thumbnail = $story->getThumbnail();
-                        if ($source !== null) {
-                            $source = (object) [
-                                'id' => $source->id,
-                                'alt' => $source->alt,
-                                'mime' => $source->mime,
-                                'width' => $thumbnail->width,
-                                'height' => $thumbnail->height,
-                                'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
-                            ];
-                        }
-                        if ($thumbnail !== null) {
-                            $thumbnail = (object) [
-                                'id' => $thumbnail->id,
-                                'alt' => $thumbnail->alt,
-                                'mime' => $thumbnail->mime,
-                                'width' => $thumbnail->width,
-                                'height' => $thumbnail->height,
-                                'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
-                            ];
-                        }
+                    ->get()->map(function ($story) use ($params) {
                         return (object) [
                             'id' => $story->id,
                             'title' => $story->title,
-                            'source' => $source,
-                            'thumbnail' => $thumbnail,
+                            'source' => $story->getSource(),
+                            'thumbnail' => $story->getThumbnailOptimized($params['thumbnail_width'], $params['thumbnail_height'], $params['thumbnail_mode'], $params['thumbnail_keep_asp_ratio'], $params['thumbnail_quality'], $params['thumbnail_blur']),
                             'status' => $story->status,
                             'publish' => $story->publish,
                             'views' => $story->views,
@@ -351,7 +350,7 @@ class Stories extends API
                     });
             });
 
-            $stories_count = Cache::remember($cache_tag . '_count', now()->addSeconds(API::CACHE_TIME), function () use ($params) {
+            $stories_count = Cache::remember($cache_tag . '_count', now()->addSeconds(API::CACHE_TTL), function () use ($params) {
                 return mStories::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
@@ -360,7 +359,7 @@ class Stories extends API
                 'message' => __('Failed to get story list.'),
             ];
             if (env('APP_DEBUG', false)) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -381,6 +380,12 @@ class Stories extends API
     {
         if (($params = API::doValidate($r, [
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
+            'thumbnail_width' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'thumbnail_height' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'thumbnail_mode' => ['nullable', 'string', 'in:fit,resize,crop'],
+            'thumbnail_keep_asp_ratio' => ['nullable', new strBoolean],
+            'thumbnail_quality' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'thumbnail_blur' => ['nullable', new strBoolean],
         ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -389,7 +394,7 @@ class Stories extends API
             return $story;
         }
 
-        $r->data = API::story($story);
+        $r->data = API::story($story, $params);
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

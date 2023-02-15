@@ -19,7 +19,7 @@ return new class extends Migration
             $table->foreign('product_id')->references('id')->on('livestreams_products')->onDelete('cascade');
             $table->uuid('media_id')->nullable()->default(null)->index();
             $table->foreign('media_id')->references('id')->on('livestream_medias')->onDelete('cascade');
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

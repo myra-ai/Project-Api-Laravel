@@ -21,7 +21,7 @@ return new class extends Migration
             $table->uuid('company_id')->index();
             $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
             $table->string('title', $product_max_title_length);
-            $table->longText('description')->nullable()->default(null);
+            $table->text('description')->nullable()->default(null);
             $table->float('price', 8, 2, true)->default(0);
             $table->string('currency', 3)->default('BRL');
             $table->integer('status')->default(1);

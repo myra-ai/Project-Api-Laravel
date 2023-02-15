@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\Base64;
 use App\Http\Controllers\API;
+use App\Jobs\MediaResizer;
 use App\Models\Links;
 use App\Models\LiveStreamMedias;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -68,38 +69,99 @@ class LiveStreamProducts extends Authenticatable
         'deleted_at' => 'timestamp',
     ];
 
-    public function getImages()
+    public function getImages(string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
     {
-        $qry = $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')->select('media_id')->get();
-        $images = array_map(function ($i) {
-            $media = LiveStreamMedias::where('id', $i['media_id'])->first();
-            if (!$media) return null;
-            return API::getMediaCdnUrl($media->path);
-        }, $qry->toArray()) ?? [];
-        return array_filter($images);
+        return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')->select('media_id')
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get()
+            ->map(function ($i) {
+                $media = API::media($i->media_id);
+                if ($media === null) {
+                    return null;
+                }
+
+                return match ($media->s3_available) {
+                    null => API::getMediaUrl($media->id),
+                    default => API::getMediaCdnUrl($media->path)
+                };
+            });
     }
 
-    public function getImagesDetails()
+    public function getImagesDetails(string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
     {
-        $qry = $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')->get();
-        $images = array_map(function ($i) {
-            $media = LiveStreamMedias::where('id', $i['media_id'])->first();
-            if (!$media) return null;
-            $image = new \stdClass();
-            $image->id = $i['id'];
-            $image->media_id = $media->id;
-            $image->url = match ($media->s3_available) {
-                null => API::getMediaUrl($media->id),
-                default => API::getMediaCdnUrl($media->path)
-            };
-            $image->alt = $media->alt;
-            $image->mime = $media->mime;
-            $image->width = $media->width;
-            $image->height = $media->height;
-            return $image;
-        }, $qry->toArray()) ?? [];
-        return array_filter($images);
+        return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get()
+            ->map(function ($i) {
+                $media = API::media($i->media_id);
+                if ($media === null) {
+                    return null;
+                }
+
+                return (object) [
+                    'id' => $i->media_id,
+                    'media_id' => $media->id,
+                    'url' => match ($media->s3_available) {
+                        null => API::getMediaUrl($media->id),
+                        default => API::getMediaCdnUrl($media->path)
+                    },
+                    'alt' => $media->alt,
+                    'mime' => $media->mime,
+                    'width' => $media->width,
+                    'height' => $media->height,
+                ];
+            });
     }
+
+    public function getImagesDetailsOptimized(int $width = 256, int $height = 256, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'updated_at', $order = 'asc', int $offset = 0, int $limit = 30)
+    {
+        return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get()
+            ->map(function ($i) use ($width, $height, $mode, $keep_aspect_ratio, $quality, $blur, $order_by, $order, $offset) {
+                $media = API::media($i->media_id);
+                if ($media === null) {
+                    return null;
+                }
+
+                if (($optimized = API::mediaSized($i->media_id, $width, $height, $order_by, $order, $offset)) === null) {
+                    MediaResizer::dispatch($i->media_id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur);
+                } else {
+                    return (object) [
+                        'id' => $optimized->id,
+                        'media_id' => $optimized->parent_id,
+                        'url' => match ($optimized->s3_available) {
+                            null => API::getMediaUrl($optimized->id),
+                            default => API::getMediaCdnUrl($optimized->path)
+                        },
+                        'alt' => $media->alt,
+                        'mime' => $optimized->mime,
+                        'width' => $optimized->width,
+                        'height' => $optimized->height,
+                    ];
+                }
+
+                return (object) [
+                    'id' => $i->media_id,
+                    'media_id' => $media->id,
+                    'url' => match ($media->s3_available) {
+                        null => API::getMediaUrl($media->id),
+                        default => API::getMediaCdnUrl($media->path)
+                    },
+                    'alt' => $media->alt,
+                    'mime' => $media->mime,
+                    'width' => $media->width,
+                    'height' => $media->height,
+                ];
+            });
+    }
+
 
     public function addImage(string $media_id): bool | string
     {
@@ -149,11 +211,31 @@ class LiveStreamProducts extends Authenticatable
 
     public function getGroups()
     {
-        return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id');
+        return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id')->get();
     }
 
     public function getGroup()
     {
         return $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id')->first();
+    }
+
+    public function isAttachedWithStory(string $story_id, &$promoted = false): bool
+    {
+        $qry = $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id')->where('story_id', $story_id)->exists();
+        if (!$qry) {
+            return false;
+        }
+        $promoted = $qry->promoted ?? false;
+        return true;
+    }
+
+    public function isAttachedWithStream(string $stream_id, &$promoted = false): bool
+    {
+        $qry = $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id')->where('stream_id', $stream_id)->first();
+        if (!$qry) {
+            return false;
+        }
+        $promoted = $qry->promoted  ?? false;
+        return true;
     }
 }

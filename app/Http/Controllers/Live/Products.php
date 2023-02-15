@@ -88,7 +88,7 @@ class Products extends API
                         continue;
                     }
 
-                    $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(API::CACHE_TIME), function () use ($media_id) {
+                    $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(API::CACHE_TTL), function () use ($media_id) {
                         return mLiveStreamMedias::where('id', '=', $media_id)->first();
                     });
 
@@ -230,10 +230,10 @@ class Products extends API
                 if (microtime(true) - $start >= $timeout) {
                     $message = (object) [
                         'type' => 'error',
-                        'message' => 'Product could not be found',
+                        'message' => __('Product could not be found'),
                     ];
                     if (config('app.debug')) {
-                        $message->debug = 'Product could not be found after ' . $timeout . ' seconds';
+                        $message->debug = __('Product could not be found after :timeout seconds', ['timeout' => $timeout]);
                     }
                     $r->messages[] = $message;
                     return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -264,7 +264,7 @@ class Products extends API
         $params['story_id'] = isset($params['story_id']) ? $params['story_id'] : null;
         $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
 
-        if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -372,7 +372,7 @@ class Products extends API
         $params['story_id'] = isset($params['story_id']) ? $params['story_id'] : null;
         $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
 
-        if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -490,7 +490,9 @@ class Products extends API
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
-            'group_attached' => ['nullable', new strBoolean],
+            'groups' => ['nullable', new strBoolean],
+            'story_attached' => ['nullable', 'string', 'size:36', 'uuid', 'exists:stories,id'],
+            'stream_attached' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestreams,id'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -503,33 +505,45 @@ class Products extends API
             $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
             $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
             $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
-            $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
+            $params['groups'] = isset($params['groups']) ? filter_var($params['groups'], FILTER_VALIDATE_BOOLEAN) : false;
+            $params['story_attached'] = isset($params['story_attached']) ? trim($params['story_attached']) : null;
+            $params['stream_attached'] = isset($params['stream_attached']) ? trim($params['stream_attached']) : null;
             $has_token = isset($params['token']);
 
+            $cache_tag = 'products_by_company_' . $company_id;
+            $cache_tag .= implode('_', $params);
+
             $products = match ($has_token) {
-                true => Cache::remember('products_by_company_' . $company_id . '_with_token', now()->addSecond(), function () use ($company_id, $params) {
-                    $products = mLiveStreamProducts::where('company_id', '=', $company_id)
+                true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($company_id, $params) {
+                    return mLiveStreamProducts::where('company_id', '=', $company_id)
                         ->where('deleted_at', '=', null)->offset($params['offset'])
                         ->limit($params['limit'])
                         ->orderBy($params['order_by'], $params['order'])
-                        ->get();
-                    return $products->map(function ($product) use ($params) {
-                        $product->images = $product->getImagesDetails();
-                        $product->link = $product->getLink();
+                        ->get()
+                        ->map(function ($product) use ($params) {
+                            $product->images = $product->getImagesDetailsOptimized();
+                            $product->link = $product->getLink();
 
-                        $group = $product->getGroup();
-                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
-                        unset($group->promoted);
+                            if ($params['groups']) {
+                                $product->groups = $product->getGroups()->map(function ($group) {
+                                    $group->makeHidden(['product_id']);
+                                    return $group;
+                                });
+                            }
 
-                        if ($params['group_attached']) {
-                            $product->group = $group;
-                        }
+                            $promoted = false;
+                            if ($params['story_attached'] !== null) {
+                                $product->attached = $product->isAttachedWithStory($params['story_attached'], $promoted);
+                            } else if ($params['stream_attached'] !== null) {
+                                $product->attached = $product->isAttachedWithStream($params['stream_attached'], $promoted);
+                            }
 
-                        $product->created = $product->created_at;
-                        return $product;
-                    });
+                            $product->promoted = $promoted;
+                            $product->created = $product->created_at;
+                            return $product;
+                        });
                 }),
-                default => Cache::remember('products_by_company_' . $company_id . '_without_token', now()->addSeconds(API::CACHE_TIME), function () use ($company_id, $params) {
+                default => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($company_id, $params) {
                     $products = mLiveStreamProducts::where('company_id', '=', $company_id)
                         ->where('status', '=', 1)
                         ->where('deleted_at', '=', null)->offset($params['offset'])
@@ -551,7 +565,7 @@ class Products extends API
                 })
             };
 
-            $products_total = Cache::remember('products_by_company_' . $company_id . '_total', now()->addSeconds(API::CACHE_TIME), function () use ($company_id) {
+            $products_total = Cache::remember('products_by_company_' . $company_id . '_total', now()->addSeconds(API::CACHE_TTL), function () use ($company_id) {
                 return mLiveStreamProducts::where('company_id', '=', $company_id)
                     ->where('deleted_at', '=', null)
                     ->count();
@@ -590,7 +604,6 @@ class Products extends API
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
-            'group_attached' => ['nullable', new strBoolean],
         ], $request->all(), ['stream_id' => $stream_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -603,55 +616,43 @@ class Products extends API
             $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
             $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
             $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
-            $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
             $has_token = isset($params['token']);
 
+            $cache_tag = 'products_by_stream_' . $stream_id;
+            $cache_tag .= implode('_', $params);
+
             $products = match ($has_token) {
-                true => Cache::remember('products_by_stream_' . $stream_id . '_with_token', now()->addSeconds(API::CACHE_TIME), function () use ($stream_id, $params) {
+                true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($stream_id, $params) {
                     $products = new mLiveStreamProducts();
-                    $products = $products->getProductsByStreamID($stream_id)
+                    return $products->getProductsByStreamID($stream_id)
+                        ->orderBy($params['order_by'], $params['order'])
                         ->offset($params['offset'])
                         ->limit($params['limit'])
-                        ->orderBy($params['order_by'], $params['order'])
-                        ->get();
-                    return $products->map(function ($product) {
-                        $product->images = $product->getImagesDetails();
-                        $product->link = API::getLinkUrl($product->link_id);
-
-                        $group = $product->getGroup();
-                        $group->makeHidden(['promoted']);
-
-                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
-
-                        $product->group = $group;
-                        $product->makeVisible(['created_at']);
-                        return $product;
-                    });
+                        ->get()
+                        ->map(function ($product) {
+                            $product->images = $product->getImagesDetailsOptimized();
+                            $product->link = API::getLinkUrl($product->link_id);
+                            $product->makeVisible(['created_at']);
+                            return $product;
+                        });
                 }),
-                default => Cache::remember('products_by_stream_' . $stream_id, now()->addSeconds(API::CACHE_TIME), function () use ($stream_id, $params) {
+                default => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($stream_id, $params) {
                     $products = new mLiveStreamProducts();
-                    $products = $products->getProductsByStreamID($stream_id)
+                    return $products->getProductsByStreamID($stream_id)
                         ->offset($params['offset'])
                         ->limit($params['limit'])
                         ->orderBy($params['order_by'], $params['order'])
-                        ->get();
-                    return $products->map(function ($product) {
-                        $product->images = $product->getImages();
-                        $product->link = API::getLinkUrl($product->link_id);
-
-                        $group = $product->getGroup();
-                        $group->makeHidden(['promoted']);
-
-                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
-
-                        $product->group = $group;
-                        $product->makeHidden(['status', 'group_id']);
-                        return $product;
-                    });
+                        ->get()
+                        ->map(function ($product) {
+                            $product->images = $product->getImages();
+                            $product->link = API::getLinkUrl($product->link_id);
+                            $product->makeHidden(['status', 'group_id']);
+                            return $product;
+                        });
                 })
             };
 
-            $products_total = Cache::remember('products_by_stream_' . $stream_id . '_total_', now()->addSeconds(API::CACHE_TIME), function () use ($stream_id) {
+            $products_total = Cache::remember('products_by_stream_' . $stream_id . '_total_', now()->addSeconds(API::CACHE_TTL), function () use ($stream_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStreamID($stream_id)->count();
                 return $products;
@@ -706,52 +707,40 @@ class Products extends API
             $params['group_attached'] = isset($params['group_attached']) ? filter_var($params['group_attached'], FILTER_VALIDATE_BOOLEAN) : null;
             $has_token = isset($params['token']);
 
+            $cache_tag = 'products_by_story_' . $story_id;
+            $cache_tag .= implode('_', $params);
+
             $products = match ($has_token) {
-                true => Cache::remember('products_by_story_' . $story_id . '_with_token', now()->addSeconds(API::CACHE_TIME), function () use ($story_id, $params) {
+                true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($story_id, $params) {
                     $products = new mLiveStreamProducts();
-                    $products = $products->getProductsByStoryID($story_id)
+                    return $products->getProductsByStoryID($story_id)
                         ->offset($params['offset'])
                         ->limit($params['limit'])
                         ->orderBy($params['order_by'], $params['order'])
-                        ->get();
-                    return $products->map(function ($product) {
-                        $product->images = $product->getImagesDetails();
-                        $product->link = API::getLinkUrl($product->link_id);
-
-                        $group = $product->getGroup();
-                        $group->makeHidden(['promoted']);
-
-                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
-
-                        $product->group = $group;
-                        $product->makeVisible(['created_at']);
-                        return $product;
-                    });
+                        ->get()
+                        ->map(function ($product) {
+                            $product->images = $product->getImagesDetailsOptimized();
+                            $product->link = API::getLinkUrl($product->link_id);
+                            $product->makeVisible(['created_at']);
+                            return $product;
+                        });
                 }),
-                default => Cache::remember('products_by_story_' . $story_id, now()->addSeconds(API::CACHE_TIME), function () use ($story_id, $params) {
+                default => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($story_id, $params) {
                     $products = new mLiveStreamProducts();
-                    $products = $products->getProductsByStoryID($story_id)
+                    return $products->getProductsByStoryID($story_id)
                         ->offset($params['offset'])
                         ->limit($params['limit'])
                         ->orderBy($params['order_by'], $params['order'])
-                        ->get();
-                    return $products->map(function ($product) {
-                        $product->images = $product->getImages();
-                        $product->link = API::getLinkUrl($product->link_id);
-
-                        $group = $product->getGroup();
-                        $group->makeHidden(['promoted']);
-
-                        $product->promoted = $group !== null ? boolval($group->promoted) : false;
-
-                        $product->group = $group;
-                        $product->makeHidden(['status', 'group_id']);
-                        return $product;
-                    });
+                        ->get()->map(function ($product) {
+                            $product->images = $product->getImages();
+                            $product->link = API::getLinkUrl($product->link_id);
+                            $product->makeHidden(['status', 'group_id']);
+                            return $product;
+                        });
                 })
             };
 
-            $products_total = Cache::remember('products_by_story_' . $story_id . '_total_', now()->addSeconds(API::CACHE_TIME), function () use ($story_id) {
+            $products_total = Cache::remember('products_by_story_' . $story_id . '_total_', now()->addSeconds(API::CACHE_TTL), function () use ($story_id) {
                 $products = new mLiveStreamProducts();
                 $products = $products->getProductsByStoryID($story_id)->count();
                 return $products;
@@ -790,7 +779,7 @@ class Products extends API
             return $params;
         }
 
-        if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -832,7 +821,7 @@ class Products extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        if (($product = API::getProduct($r, $product_id)) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -865,7 +854,7 @@ class Products extends API
                 'message' => __('Product could not be updated.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -895,11 +884,11 @@ class Products extends API
             return $params;
         }
 
-        if (($media = API::getMedia($r, $params['media_id'])) instanceof JsonResponse) {
+        if (($media = API::getMedia($params['media_id'], $r)) instanceof JsonResponse) {
             return $media;
         }
 
-        if (($product = API::getProduct($r, $params['product_id'])) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -944,7 +933,7 @@ class Products extends API
                 'message' => __('Image could not be deleted.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -970,7 +959,7 @@ class Products extends API
             return $params;
         }
 
-        if (($product = API::getProduct($r, $product_id)) instanceof JsonResponse) {
+        if (($product = API::getProduct($params['product_id'], $r)) instanceof JsonResponse) {
             return $product;
         }
 
@@ -985,7 +974,7 @@ class Products extends API
                 'message' => __('Product could not be deleted.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

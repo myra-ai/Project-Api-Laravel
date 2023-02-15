@@ -36,7 +36,7 @@ return new class extends Migration
             $table->bigInteger('shares')->unsigned()->default(0)->index();
             $table->bigInteger('views')->unsigned()->default(0)->index();
             $table->bigInteger('max_duration')->default(43200);
-            $table->longText('note')->nullable()->default(null);
+            $table->text('note')->nullable()->default(null);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
             $table->timestamps(6);
         });

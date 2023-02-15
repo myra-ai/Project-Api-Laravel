@@ -14,7 +14,6 @@ use App\Models\Stories as mStories;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
 
 class DatabaseSeeder extends Seeder
 {
@@ -25,29 +24,12 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        if (Storage::directoryMissing('public/images')) {
-            Storage::makeDirectory('public/images');
-        }
-
-        if (Storage::directoryMissing('public/images/thumbnails')) {
-            Storage::makeDirectory('public/images/thumbnails');
-        }
-
-        if (Storage::directoryMissing('public/videos')) {
-            Storage::makeDirectory('public/videos');
-        }
-
-        if (Storage::directoryMissing('public/unknown')) {
-            Storage::makeDirectory('public/unknown');
-        }
-
-        $tenant_id = '2278df21-2f4f-40dd-918a-6650eb1e3e91'; // Str::uuid()->toString();
         $company_id = '1ad782fc-cc4b-4ba7-b91c-ec90d3464529'; // Str::uuid()->toString();
         $user_id = '19a329fa-0d45-43cf-b878-b428d0b33ad2'; // Str::uuid()->toString();
 
 
-        $avatar = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Avatar', desc: 'Default avatar');
-        $logo = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Logo', desc: 'Default logo');
+        $avatar = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Avatar', legend: 'Default avatar');
+        $logo = API::registerMediaFromUrl('https://cdn.eibly.com/images/avatars/4545133762933_59a0cfb8e43a20afa86b_88.png', alt: 'Bliver Logo', legend: 'Default logo');
 
         mLiveStreamCompanies::create([
             'id' => $company_id,
@@ -89,17 +71,17 @@ class DatabaseSeeder extends Seeder
             'expires_at' => now()->addDays(30)->format('Y-m-d H:i:s.u'),
         ]);
 
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/32.webp', alt: 'Placeholder 32', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/64.webp', alt: 'Placeholder 64', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/128.webp', alt: 'Placeholder 128', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/300.webp', alt: 'Placeholder 300', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/512.webp', alt: 'Placeholder 512', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1024.webp', alt: 'Placeholder 1024', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1200.webp', alt: 'Placeholder 1200', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1400.webp', alt: 'Placeholder 1400', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1600.webp', alt: 'Placeholder 1600', desc: 'Default image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1920x1080.webp', alt: 'Placeholder 1920x1080', desc: 'Landscape image placeholder');
-        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1080x1920.webp', alt: 'Placeholder 1080x1920', desc: 'Portrait image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/32.webp', alt: 'Placeholder 32', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/64.webp', alt: 'Placeholder 64', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/128.webp', alt: 'Placeholder 128', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/300.webp', alt: 'Placeholder 300', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/512.webp', alt: 'Placeholder 512', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1024.webp', alt: 'Placeholder 1024', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1200.webp', alt: 'Placeholder 1200', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1400.webp', alt: 'Placeholder 1400', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1600.webp', alt: 'Placeholder 1600', legend: 'Default image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1920x1080.webp', alt: 'Placeholder 1920x1080', legend: 'Landscape image placeholder');
+        API::registerMediaFromUrl('https://cdn.eibly.com/images/placeholders/1080x1920.webp', alt: 'Placeholder 1080x1920', legend: 'Portrait image placeholder');
 
         $story_id = '3820b3ac-b55a-4e52-a4fa-97fbbb532c39'; // Str::uuid()->toString();
         $story_id2 = '4b5912d4-2671-4cd2-a736-4f8da90b2ec7'; // Str::uuid()->toString();

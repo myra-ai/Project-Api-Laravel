@@ -18,7 +18,6 @@ use App\Models\Stories as mStories;
 use App\Models\StoryMetrics as mStoryMetrics;
 use App\Models\SwipeMetrics as mSwipeMetrics;
 use Browser;
-use FFMpeg\Coordinate\Dimension;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
 use GeoIp2\Database\Reader;
@@ -30,25 +29,30 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManagerStatic as Image;
+use Imagick;
 use Ramsey\Uuid\Uuid;
+use App\Jobs\SyncWithS3;
 
 class API extends Controller
 {
     const MEDIA_TYPE_UNKNOWN = 0;
     const MEDIA_TYPE_IMAGE = 1;
     const MEDIA_TYPE_IMAGE_THUMBNAIL = 2;
-    const MEDIA_TYPE_VIDEO = 3;
-    const MEDIA_TYPE_AUDIO = 4;
-    const MEDIA_TYPE_DOCUMENT = 5;
-    const MEDIA_TYPE_ARCHIVE = 6;
+    const MEDIA_TYPE_IMAGE_AVATAR = 3;
+    const MEDIA_TYPE_IMAGE_LOGO = 4;
+    const MEDIA_TYPE_VIDEO = 5;
+    const MEDIA_TYPE_AUDIO = 6;
+    const MEDIA_TYPE_DOCUMENT = 7;
+    const MEDIA_TYPE_ARCHIVE = 8;
 
-    const CACHE_TIME = 3;
+    const CACHE_TTL = 3;
     const COMMENTS_CACHE_TIME = 1;
     const LIVESTREAM_CACHE_TIME = 3;
     const METRICS_CACHE_TIME = 30;
     const PRODUCTS_CACHE_TIME = 3;
     const STORY_CACHE_TIME = 3;
+    const CACHE_TTL_MEDIA = 3600;
+    const CACHE_TTL_PRODUCTS = 1;
 
     const STORY_STATUS_DRAFT = 0;
     const STORY_STATUS_ACTIVE = 1;
@@ -67,6 +71,8 @@ class API extends Controller
         self::MEDIA_TYPE_UNKNOWN => 'unknown',
         self::MEDIA_TYPE_IMAGE => 'image',
         self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'image_thumbnail',
+        self::MEDIA_TYPE_IMAGE_AVATAR => 'image_avatar',
+        self::MEDIA_TYPE_IMAGE_LOGO => 'image_logo',
         self::MEDIA_TYPE_VIDEO => 'video',
         self::MEDIA_TYPE_AUDIO => 'audio',
         self::MEDIA_TYPE_DOCUMENT => 'document',
@@ -380,7 +386,7 @@ class API extends Controller
         $story = null;
 
         try {
-            $story = Cache::remember('story_by_id_' . $story_id, now()->addSeconds(self::CACHE_TIME), function () use ($story_id) {
+            $story = Cache::remember('story_by_id_' . $story_id, now()->addSeconds(API::CACHE_TTL), function () use ($story_id) {
                 return mStories::where('id', '=', $story_id)->where('deleted_at', '=', null)->first();
             });
         } catch (\Exception $e) {
@@ -412,34 +418,18 @@ class API extends Controller
 
     public static function story(object $story): object
     {
-        $source = $story->getSource();
-        $thumbnail = $story->getThumbnail();
-        if ($source !== null) {
-            $source = (object) [
-                'id' => $source->id,
-                'alt' => $source->alt,
-                'mime' => $source->mime,
-                'width' => $source->width,
-                'height' => $source->height,
-                'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
-            ];
-        }
-        if ($thumbnail !== null) {
-            $thumbnail = (object) [
-                'id' => $thumbnail->id,
-                'alt' => $thumbnail->alt,
-                'mime' => $thumbnail->mime,
-                'width' => $thumbnail->width,
-                'height' => $thumbnail->height,
-                'url' => $thumbnail->s3_available !== null ? API::getMediaCdnUrl($thumbnail->path) : API::getMediaUrl($thumbnail->id),
-            ];
-        }
+        $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 96;
+        $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 96;
+        $params['thumbnail_mode'] = isset($params['thumbnail_mode']) ? $params['thumbnail_mode'] : 'fit';
+        $params['thumbnail_keep_asp_ratio'] = isset($params['thumbnail_keep_asp_ratio']) ? filter_var($params['thumbnail_keep_asp_ratio'], FILTER_VALIDATE_BOOLEAN) : true;
+        $params['thumbnail_quality'] = isset($params['thumbnail_quality']) ? intval($params['thumbnail_quality']) : 80;
+        $params['thumbnail_blur'] = isset($params['thumbnail_blur']) ? filter_var($params['thumbnail_blur'], FILTER_VALIDATE_BOOLEAN) : false;
 
         return (object) [
             'company_id' => $story->company_id,
             'title' => $story->title,
-            'source' => $source,
-            'thumbnail' => $thumbnail,
+            'source' => $story->getSource(),
+            'thumbnail' => $story->getThumbnailOptimized($params['thumbnail_width'], $params['thumbnail_height'], $params['thumbnail_mode'], $params['thumbnail_keep_asp_ratio'], $params['thumbnail_quality'], $params['thumbnail_blur']),
             'status' => $story->status,
             'publish' => $story->publish,
             'viewers' => $story->viewers,
@@ -468,7 +458,7 @@ class API extends Controller
         $stream = null;
 
         try {
-            $stream = Cache::remember('stream_by_id_' . $stream_id, now()->addSeconds(self::CACHE_TIME), function () use ($stream_id) {
+            $stream = Cache::remember('stream_by_id_' . $stream_id, now()->addSeconds(API::CACHE_TTL), function () use ($stream_id) {
                 $stream = mLiveStreams::where('id', '=', $stream_id)->where('deleted_at', '=', null)->first();
                 if ($stream === null) {
                     return null;
@@ -644,13 +634,15 @@ class API extends Controller
         return match ($type) {
             self::MEDIA_TYPE_IMAGE => 'images/',
             self::MEDIA_TYPE_IMAGE_THUMBNAIL => 'images/thumbnails/',
+            self::MEDIA_TYPE_IMAGE_AVATAR => 'images/avatars/',
+            self::MEDIA_TYPE_IMAGE_LOGO => 'images/logos/',
             self::MEDIA_TYPE_VIDEO => 'videos/',
             self::MEDIA_TYPE_AUDIO => 'audios/',
             default => 'unknown/',
         };
     }
 
-    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
+    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -658,13 +650,15 @@ class API extends Controller
         $extension = $file->getClientOriginalExtension();
         $mime = $file->getMimeType();
         $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
-        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, Uuid::uuid4()->toString())->toString();
+        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, $original_name . $extension . $mime . $type)->toString();
 
         $path_type = self::mediaPathType($type);
 
         $max_upload_size = match ($type) {
             self::MEDIA_TYPE_IMAGE => config('api.max_image_upload_size'),
             self::MEDIA_TYPE_IMAGE_THUMBNAIL => config('api.max_image_thumbnail_upload_size'),
+            self::MEDIA_TYPE_IMAGE_AVATAR => config('api.max_image_avatar_upload_size'),
+            self::MEDIA_TYPE_IMAGE_LOGO => config('api.max_image_logo_upload_size'),
             self::MEDIA_TYPE_VIDEO => config('api.max_video_upload_size'),
             self::MEDIA_TYPE_AUDIO => config('api.max_audio_upload_size'),
             default => config('api.max_unknown_upload_size'),
@@ -691,10 +685,10 @@ class API extends Controller
 
         $path = storage_path('app/public/' . $path);
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $legend, $r);
     }
 
-    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
+    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -775,10 +769,10 @@ class API extends Controller
 
         $path = storage_path('app/public/' . $path_type . $base_checksum . '.' . $extension);
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $desc, $r);
+        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $legend, $r);
     }
 
-    public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, string $alt = '', string $desc = '', ?object &$r = null): object
+    public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -825,100 +819,151 @@ class API extends Controller
         $height = null;
         $size = filesize($path);
         $width = null;
+        $bitrate = null;
+        $framerate = null;
+        $channels = null;
+        $quality = null;
 
         $thumbnails = [];
 
-        if ($type == self::MEDIA_TYPE_IMAGE || $type == self::MEDIA_TYPE_IMAGE_THUMBNAIL) {
-            try {
-                $image = Image::make($path);
-                $width = $image->width();
-                $height = $image->height();
-            } catch (\Exception $e) {
-                $message = (object) [
-                    'type' => 'warning',
-                    'message' => __('Failed to get image dimensions.'),
-                ];
-                if (config('app.debug')) {
-                    $message->debug = $e->getMessage();
-                }
-                $r->messages[] = $message;
-            }
-        } elseif ($type == self::MEDIA_TYPE_VIDEO) {
-            try {
-                $ffmpeg = FFMpeg::create();
-                $video = $ffmpeg->open($path);
-                $width = $video->getStreams()->videos()->first()->get('width');
-                $height = $video->getStreams()->videos()->first()->get('height');
-                $duration = $video->getStreams()->videos()->first()->get('duration');
-            } catch (\Exception $e) {
-                $message = (object) [
-                    'type' => 'warning',
-                    'message' => __('Failed to get video dimensions or duration.'),
-                ];
-                if (config('app.debug')) {
-                    $message->debug = $e->getMessage();
-                }
-                $r->messages[] = $message;
-            }
-            // Try creating a thumbnail
-            try {
-                $ffmpeg = FFMpeg::create();
-                $video = $ffmpeg->open($path);
-
-                # Create 5 thumbnails
-                for ($i = 1; $i <= 5; $i++) {
-                    $thumbnail = (object)[
-                        'media' => null,
-                        'original_name' => null,
-                        'path' => null,
-                        'checksum' => null,
-                        'size' => 0,
-                        'width' => null,
-                        'height' => null,
+        switch ($type) {
+            case self::MEDIA_TYPE_IMAGE:
+            case self::MEDIA_TYPE_IMAGE_THUMBNAIL:
+            case self::MEDIA_TYPE_IMAGE_AVATAR:
+            case self::MEDIA_TYPE_IMAGE_LOGO:
+                try {
+                    $img = new Imagick();
+                    $img->readImage($path);
+                    $width = $img->getImageWidth();
+                    $height = $img->getImageHeight();
+                    $quality = $img->getImageCompressionQuality();
+                    $img->destroy();
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to get image dimensions.'),
                     ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
+                }
+                break;
+            case self::MEDIA_TYPE_VIDEO:
+                try {
+                    $ffmpeg = FFMpeg::create([
+                        'ffmpeg.binaries' => config('ffmpeg.ffmpeg.binaries'),
+                        'ffprobe.binaries' => config('ffmpeg.ffprobe.binaries'),
+                        'timeout' => config('ffmpeg.timeout'),
+                        'ffmpeg.threads' => config('ffmpeg.threads'),
+                    ]);
+                    $video = $ffmpeg->open($path);
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to initialize FFMpeg.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
+                }
+                try {
+                    $width = $video->getStreams()->videos()->first()->get('width');
+                    $height = $video->getStreams()->videos()->first()->get('height');
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to get video dimensions.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
+                }
+                try {
+                    $duration = $video->getStreams()->videos()->first()->get('duration');
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to get video duration.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
+                }
+                try {
+                    $bitrate = $video->getStreams()->videos()->first()->get('bit_rate') ?? null;
+                    $framerate = $video->getStreams()->videos()->first()->get('avg_frame_rate') ?? null;
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to get video metadata.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
+                }
 
-                    $thumbnail->original_name = $base_checksum . '-' . str_pad($i, 4, '0', STR_PAD_LEFT) . '.jpg';
-                    $thumbnail->path = 'images/thumbnails/' . $thumbnail->original_name;
-                    $thumbnail_path = storage_path('app/public/' . $thumbnail->path);
+                try {
+                    # Create 10 thumbnails
+                    for ($i = 1; $i <= 10; $i++) {
+                        $thumbnail = (object)[
+                            'media' => null,
+                            'original_name' => null,
+                            'hash' => $base_checksum,
+                            'path' => null,
+                            'checksum' => null,
+                            'size' => 0,
+                            'width' => null,
+                            'height' => null,
+                        ];
 
-                    try {
-                        $video->frame(TimeCode::fromSeconds($i))->save($thumbnail_path);
+                        $thumbnail->original_name = $base_checksum . '-' . str_pad($i, 4, '0', STR_PAD_LEFT) . '.jpg';
+                        $thumbnail->path = 'images/thumbnails/' . $thumbnail->original_name;
+                        $thumbnail_path = storage_path('app/public/' . $thumbnail->path);
 
-                        if (!Storage::disk('public')->exists($thumbnail->path)) {
+                        try {
+                            $video->frame(TimeCode::fromSeconds($i))->save($thumbnail_path);
+
+                            if (!Storage::disk('public')->exists($thumbnail->path)) {
+                                continue;
+                            }
+                        } catch (\Exception $e) {
+                            $message = (object) [
+                                'type' => 'warning',
+                                'message' => __('Failed to create video thumbnail.'),
+                            ];
+                            if (config('app.debug')) {
+                                $message->debug = $e->getMessage();
+                            }
+                            $r->messages[] = $message;
                             continue;
                         }
-                    } catch (\Exception $e) {
-                        $message = (object) [
-                            'type' => 'warning',
-                            'message' => __('Failed to create video thumbnail.'),
-                        ];
-                        if (config('app.debug')) {
-                            $message->debug = $e->getMessage();
-                        }
-                        $r->messages[] = $message;
-                        continue;
+
+                        $thumbnail->checksum = self::getFileChecksum($thumbnail_path, true);
+                        $thumbnail->extension = 'jpg';
+                        $thumbnail->height = $video->getStreams()->videos()->first()->get('height');
+                        $thumbnail->mime = 'image/jpeg';
+                        $thumbnail->size = filesize($thumbnail_path);
+                        $thumbnail->type = self::MEDIA_TYPE_IMAGE_THUMBNAIL;
+                        $thumbnail->width = $video->getStreams()->videos()->first()->get('width');
+
+                        $thumbnails[] = $thumbnail;
                     }
-
-                    $thumbnail->checksum = self::getFileChecksum($thumbnail_path, true);
-                    $thumbnail->extension = 'jpg';
-                    $thumbnail->height = $video->getStreams()->videos()->first()->get('height');
-                    $thumbnail->mime = 'image/jpeg';
-                    $thumbnail->size = filesize($thumbnail_path);
-                    $thumbnail->type = self::MEDIA_TYPE_IMAGE_THUMBNAIL;
-                    $thumbnail->width = $video->getStreams()->videos()->first()->get('width');
-
-                    $thumbnails[] = $thumbnail;
+                } catch (\Exception $e) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to create video thumbnail.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = $e->getMessage();
+                    }
+                    $r->messages[] = $message;
                 }
-            } catch (\Exception $e) {
-                $message = (object) [
-                    'type' => 'warning',
-                    'message' => __('Failed to create video thumbnail.'),
-                ];
-                if (config('app.debug')) {
-                    $message->debug = $e->getMessage();
-                }
-                $r->messages[] = $message;
-            }
+                break;
         }
 
         try {
@@ -951,6 +996,7 @@ class API extends Controller
             $media->id = $id;
             $media->checksum = $checksum;
             $media->original_name = $original_name;
+            $media->hash = $base_checksum;
             $media->path = $path_type . $base_checksum . '.' . $extension;
             $media->policy = 'public';
             $media->type = $type;
@@ -960,19 +1006,27 @@ class API extends Controller
             $media->width = $width;
             $media->height = $height;
             $media->duration = $duration;
-            $media->description = $desc;
+            $media->bitrate = $bitrate;
+            $media->framerate = $framerate;
+            $media->channels = $channels;
+            $media->quality = $quality;
             $media->alt = $alt;
+            $media->legend = $legend;
             $media->created_at = now()->format('Y-m-d H:i:s.u');
             $media->save();
             $media->id = $id;
 
+            SyncWithS3::dispatch($media);
+
             if (count($thumbnails) > 0) {
                 foreach ($thumbnails as $thumbnail) {
+                    $thumbnail_id = Str::uuid()->toString();
                     $thumbnail_media = new mLiveStreamMedias();
-                    $thumbnail_media->id = Str::uuid()->toString();
+                    $thumbnail_media->id = $thumbnail_id;
                     $thumbnail_media->parent_id = $id;
                     $thumbnail_media->checksum = $thumbnail->checksum;
                     $thumbnail_media->original_name = $thumbnail->original_name;
+                    $thumbnail_media->hash = $thumbnail->hash;
                     $thumbnail_media->path = $thumbnail->path;
                     $thumbnail_media->policy = 'public';
                     $thumbnail_media->type =  $thumbnail->type;
@@ -984,6 +1038,8 @@ class API extends Controller
                     $thumbnail_media->duration = null;
                     $thumbnail_media->created_at = now()->format('Y-m-d H:i:s.u');
                     $thumbnail_media->save();
+
+                    SyncWithS3::dispatch($thumbnail_id);
                 }
             }
         } catch (\Exception $e) {
@@ -1009,14 +1065,14 @@ class API extends Controller
      * 
      * @return object
      */
-    public static function getProduct(?object &$r = null, string $product_id): object
+    public static function getProduct(string $product_id, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
         $product = null;
 
         try {
-            $product = Cache::remember('product_by_id_' . $product_id, now()->addSeconds(self::CACHE_TIME), function () use ($product_id) {
+            $product = Cache::remember('product_by_id_' . $product_id, now()->addSeconds(API::CACHE_TTL), function () use ($product_id) {
                 return mLiveStreamProducts::where('id', '=', $product_id)->first();
             });
         } catch (\Exception $e) {
@@ -1066,7 +1122,7 @@ class API extends Controller
         $group = null;
 
         try {
-            $group = Cache::remember('product_group_' . $group_id, now()->addSeconds(self::CACHE_TIME), function () use ($group_id) {
+            $group = Cache::remember('product_group_' . $group_id, now()->addSeconds(API::CACHE_TTL), function () use ($group_id) {
                 return mLiveStreamProductGroups::where('id', '=', $group_id)->first();
             });
         } catch (\Exception $e) {
@@ -1107,7 +1163,7 @@ class API extends Controller
         $image = null;
 
         try {
-            $image = Cache::remember('product_image_by_id_' . $image_id, now()->addSeconds(self::CACHE_TIME), function () use ($image_id) {
+            $image = Cache::remember('product_image_by_id_' . $image_id, now()->addSeconds(API::CACHE_TTL), function () use ($image_id) {
                 return mLiveStreamProductsImages::where('id', '=', $image_id)->first();
             });
         } catch (\Exception $e) {
@@ -1133,17 +1189,52 @@ class API extends Controller
         return $image;
     }
 
+    public static function media(string $media_id, string $order_by = 'created_at', string $order = 'asc', int $offset = 0): ?mLiveStreamMedias
+    {
+        $cache_tag = 'media_by_id_' . $media_id;
+        $media = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_MEDIA), function () use ($media_id, $order_by, $order, $offset) {
+            return mLiveStreamMedias::where('id', '=', $media_id)
+                ->where('deleted_at', '=', null)
+                ->orderBy($order_by, $order)
+                ->offset($offset)
+                ->first();
+        });
 
-    public static function getMedia(?object &$r = null, string $media_id): object
+        if ($media === null) {
+            Cache::put($cache_tag, null, now()->addSeconds(3));
+        }
+
+        return $media;
+    }
+
+    public static function mediaSized(string $media_id, int $width, int $height, string $order_by = 'created_at', string $order = 'asc', int $offset = 0): ?mLiveStreamMedias
+    {
+        $cache_tag = 'media_by_id_' . $media_id . '_' . $width . '_' . $height;
+        $media = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_MEDIA), function () use ($media_id, $width, $height, $order_by, $order, $offset) {
+            return mLiveStreamMedias::where('parent_id', '=', $media_id)
+                ->where('deleted_at', '=', null)
+                ->where('width', '=', $width)
+                ->where('height', '=', $height)
+                ->orderBy($order_by, $order)
+                ->offset($offset)
+                ->first();
+        });
+
+        if ($media === null) {
+            Cache::put($cache_tag, null, now()->addSeconds(3));
+        }
+
+        return $media;
+    }
+
+    public static function getMedia(string $media_id, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
         $media = null;
 
         try {
-            $media = Cache::remember('media_by_id_' . $media_id, now()->addSeconds(30), function () use ($media_id) {
-                return mLiveStreamMedias::where('id', '=', $media_id)->first();
-            });
+            $media = API::media($media_id);
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -1180,48 +1271,6 @@ class API extends Controller
         return $media;
     }
 
-    public static function doSyncMediaWithCDN(?object $media, ?object &$r = null): mixed
-    {
-        $r = $r ?? self::INIT();
-
-        if ($media === null) {
-            return false;
-        }
-
-        if ($media->s3_available === null) {
-            $in_s3 = false;
-            if (Storage::disk('s3')->exists($media->path) === false) {
-                $file = Storage::disk('public')->get($media->path);
-
-                if ($file === false || $file === null) {
-                    $r->messages[] = (object) [
-                        'type' => 'error',
-                        'message' => __('File not found.'),
-                    ];
-                    return response()->json($r, Response::HTTP_NOT_FOUND);
-                }
-
-                $in_s3 = Storage::disk('s3')->put($media->path, $file, [
-                    'ContentType' => $media->mime,
-                    'ContentDisposition' => 'inline; filename="' . $media->original_name . '"',
-                    'CacheControl' => 'max-age=31536000, public',
-                    'x-aws-meta-checksum' => $media->checksum,
-                    'ACL' => 'public-read',
-                ]);
-            } else {
-                $in_s3 = true;
-            }
-            
-            if ($in_s3 === true) {
-                $media->s3_available = now()->format('Y-m-d H:i:s.u');
-                $media->save();
-            }
-            return self::getMediaCdnUrl($media->path);
-        }
-
-        return self::getMediaCdnUrl($media->path);
-    }
-
     public static function getMediaByPath(?object &$r = null, string $path): object
     {
         $r = $r ?? self::INIT();
@@ -1229,7 +1278,7 @@ class API extends Controller
         $media = null;
 
         try {
-            $media = Cache::remember('media_by_path_' . $path, now()->addSeconds(self::CACHE_TIME), function () use ($path) {
+            $media = Cache::remember('media_by_path_' . $path, now()->addSeconds(API::CACHE_TTL), function () use ($path) {
                 return mLiveStreamMedias::where('path', '=', $path)->first();
             });
         } catch (\Exception $e) {
@@ -1275,7 +1324,7 @@ class API extends Controller
         $t = null;
 
         try {
-            $t = Cache::remember('token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token) {
+            $t = Cache::remember('token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($token) {
                 return mLiveStreamCompanyTokens::where('token', '=', $token)->where('expires_at', '>', now()->format('Y-m-d H:i:s.u'))->first();
             });
         } catch (\Exception $e) {
@@ -1308,7 +1357,7 @@ class API extends Controller
         $company_user = null;
 
         try {
-            $company_user = Cache::remember('company_user_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($email) {
+            $company_user = Cache::remember('company_user_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($email) {
                 return mLiveStreamCompanyUsers::where('email', '=', $email)->first();
             });
         } catch (\Exception $e) {
@@ -1350,7 +1399,7 @@ class API extends Controller
         $company_user = null;
 
         try {
-            $company_user = Cache::remember('company_user_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token) {
+            $company_user = Cache::remember('company_user_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($token) {
                 $tokens = mLiveStreamCompanyTokens::where('token', '=', $token)->first();
 
                 if ($tokens === null) {
@@ -1398,7 +1447,7 @@ class API extends Controller
         $company_user = null;
 
         try {
-            $company_user = Cache::remember('company_user_by_id_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $id)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($id) {
+            $company_user = Cache::remember('company_user_by_id_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $id)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($id) {
                 return mLiveStreamCompanyUsers::where('id', '=', $id)->first();
             });
         } catch (\Exception $e) {
@@ -1440,7 +1489,7 @@ class API extends Controller
         $company = null;
 
         try {
-            $company = Cache::remember('company_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(self::CACHE_TIME), function () use ($token, &$r) {
+            $company = Cache::remember('company_by_token_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $token)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($token, &$r) {
                 $tokens = mLiveStreamCompanyTokens::where('token', '=', $token)->first();
 
                 if ($tokens === null) {
@@ -1493,7 +1542,7 @@ class API extends Controller
         $company = null;
 
         try {
-            $company = Cache::remember('company_' . $company_id, now()->addSeconds(self::CACHE_TIME), function () use ($company_id) {
+            $company = Cache::remember('company_' . $company_id, now()->addSeconds(API::CACHE_TTL), function () use ($company_id) {
                 return mLiveStreamCompanies::where('id', '=', $company_id)->first();
             });
         } catch (\Exception $e) {

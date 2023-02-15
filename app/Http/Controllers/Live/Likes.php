@@ -44,13 +44,13 @@ class Likes extends API
                 API::registerStreamMetric($request, $params, [
                     'like' => 1,
                 ]);
-                Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(self::CACHE_TIME));
+                Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(API::CACHE_TTL));
             } else {
                 $story->increment('likes');
                 API::registerStoryMetric($request, $params, [
                     'like' => 1,
                 ]);
-                Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(self::CACHE_TIME));
+                Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(API::CACHE_TTL));
             }
         } catch (\Exception $e) {
             $message = (object)[
@@ -58,7 +58,7 @@ class Likes extends API
                 'message' => __('Failed to add like.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
@@ -109,7 +109,7 @@ class Likes extends API
                     API::registerStreamMetric($request, $params, [
                         'unlike' => 1,
                     ]);
-                    Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(self::CACHE_TIME));
+                    Cache::put('stream_by_id_' . $stream->id, $stream, now()->addSeconds(API::CACHE_TTL));
                 } else {
                     $r->messages[] = (object) [
                         'type' => 'warning',
@@ -123,7 +123,7 @@ class Likes extends API
                     API::registerStoryMetric($request, $params, [
                         'unlike' => 1,
                     ]);
-                    Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(self::CACHE_TIME));
+                    Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(API::CACHE_TTL));
                 } else {
                     $r->messages[] = (object) [
                         'type' => 'warning',
@@ -138,7 +138,7 @@ class Likes extends API
                 'message' => __('Failed to remove like.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

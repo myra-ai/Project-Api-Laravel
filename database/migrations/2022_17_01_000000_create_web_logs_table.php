@@ -24,8 +24,8 @@ return new class extends Migration
             $table->string('request_scheme', 8);
             $table->string('request_host', 64)->index();
             $table->integer('request_port');
-            $table->longText('request_path')->nullable()->default(null);
-            $table->longText('request_query')->nullable()->default(null);
+            $table->text('request_path')->nullable()->default(null);
+            $table->text('request_query')->nullable()->default(null);
             $table->integer('response_status')->nullable()->default(null)->index();
             $table->float('request_time')->nullable()->default(null)->index();
             $table->float('connection_time')->nullable()->default(null)->index();
@@ -36,7 +36,7 @@ return new class extends Migration
             $table->integer('content_length')->default(0)->index();
             $table->bigInteger('response_size')->default(0)->index();
             $table->bigInteger('request_size')->default(0)->index();
-            $table->longText('request_referer')->nullable()->default(null)->index();
+            $table->text('request_referer')->nullable()->default(null)->index();
             $table->string('request_ssl_cipher', 128)->nullable()->default(null)->index();
             $table->string('request_ssl_protocol', 96)->nullable()->default(null)->index();
             $table->string('request_ip', 64)->nullable()->default(null)->index();
@@ -53,7 +53,7 @@ return new class extends Migration
             $table->string('request_ip_currency', 8)->nullable()->default(null);
             $table->string('request_ip_asn', 32)->nullable()->default(null)->index();
             $table->string('request_ip_org', 128)->nullable()->default(null)->index();
-            $table->longText('request_agent')->nullable()->default(null);
+            $table->text('request_agent')->nullable()->default(null);
             $table->string('request_agent_browser')->nullable()->default(null)->index();
             $table->string('request_agent_browser_version')->nullable()->default(null);
             $table->string('request_agent_browser_platform')->nullable()->default(null)->index();

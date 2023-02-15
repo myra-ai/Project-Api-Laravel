@@ -296,7 +296,7 @@ class Comments extends API
                 'message' => __('Failed to get comments count.'),
             ];
             if (config('app.debug')) {
-                $message['debug'] = $e->getMessage();
+                $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
