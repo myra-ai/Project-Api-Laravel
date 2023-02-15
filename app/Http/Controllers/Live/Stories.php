@@ -19,6 +19,7 @@ class Stories extends API
     public function doCreate(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
             'title' => ['required', 'string', 'min:4', 'max:100'],
             'media_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
@@ -137,6 +138,7 @@ class Stories extends API
     public function doUpdate(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
             'title' => ['nullable', 'string', 'min:4', 'max:100'],
             'media_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestream_medias,id'],
@@ -245,6 +247,7 @@ class Stories extends API
     public function doDelete(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
         ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
             return $params;
@@ -282,7 +285,7 @@ class Stories extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getByStoryCompanyID(Request $request, ?string $company_id = null): JsonResponse
+    public function getListCompanyId(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
@@ -376,9 +379,10 @@ class Stories extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
-    public function getByStoryID(Request $request, ?string $story_id = null): JsonResponse
+    public function getById(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
             'thumbnail_width' => ['nullable', 'integer', 'min:32', 'max:1920'],
             'thumbnail_height' => ['nullable', 'integer', 'min:32', 'max:1920'],
@@ -395,36 +399,6 @@ class Stories extends API
         }
 
         $r->data = API::story($story, $params);
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function getSwipes(Request $request, ?string $company_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-        ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        $r->data = API::story($story);
-        $r->success = true;
-        return response()->json($r, Response::HTTP_OK);
-    }
-
-    public function addStoryToSwipe(Request $request, ?string $story_id = null): JsonResponse
-    {
-        if (($params = API::doValidate($r, [
-            'story_id' => ['required', 'string', 'size:36', 'uuid'],
-        ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
-            return $params;
-        }
-
-        if (($story = API::getStory($r, $params['story_id'])) instanceof JsonResponse) {
-            return $story;
-        }
-
-        $r->data = API::story($story);
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

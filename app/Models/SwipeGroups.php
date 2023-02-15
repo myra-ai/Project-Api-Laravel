@@ -21,6 +21,7 @@ class SwipeGroups extends Authenticatable
      */
     protected $fillable = [
         'id',
+        'swipe_id',
         'story_id',
         'created_at',
         'updated_at',
@@ -33,8 +34,8 @@ class SwipeGroups extends Authenticatable
      */
     protected $casts = [
         'id' => 'string',
+        'swipe_id' => 'string',
         'story_id' => 'string',
-        'title' => 'string',
         'created_at' => 'timestamp',
         'updated_at' => 'timestamp',
     ];

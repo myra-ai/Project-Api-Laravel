@@ -32,11 +32,18 @@ Route::delete('/stream/{stream_id}', [L\Streams::class, 'doDelete']);
 Route::get('/stream/rtmp/{stream_id}', [L\Streams::class, 'getRTMP']);
 
 Route::post('/story/{company_id}', [L\Stories::class, 'doCreate']);
-Route::get('/stories/{company_id}', [L\Stories::class, 'getByStoryCompanyID']);
-Route::get('/story/swipe/{storie_id}', [L\Stories::class, 'storieList']);
-Route::get('/story/{story_id}', [L\Stories::class, 'getByStoryID']);
+Route::get('/stories/{company_id}', [L\Stories::class, 'getListCompanyId']);
+Route::get('/story/{story_id}', [L\Stories::class, 'getById']);
 Route::put('/story/{story_id}', [L\Stories::class, 'doUpdate']);
 Route::delete('/story/{story_id}', [L\Stories::class, 'doDelete']);
+
+Route::post('/swipe/{company_id}', [L\Swipes::class, 'doCreate']);
+Route::get('/swipes/{company_id}', [L\Swipes::class, 'getListByCompanyId']);
+Route::get('/swipe/{swipe_id}', [L\Swipes::class, 'getById']);
+Route::put('/swipe/{swipe_id}', [L\Swipes::class, 'doUpdate']);
+Route::delete('/swipe/{swipe_id}', [L\Swipes::class, 'doDelete']);
+Route::post('/swipe/{swipe_id}/story', [L\Swipes::class, 'doAttachStory']);
+Route::delete('/swipe/{swipe_id}/story', [L\Swipes::class, 'doDetachStory']);
 
 // Route::get('/stream/{live_id}/asset', [L\Streams::class, 'streamAsset']);
 // Route::get('/stream/assets', [L\Streams::class, 'streamAssets']);

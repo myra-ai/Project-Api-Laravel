@@ -16,7 +16,9 @@ use App\Models\LiveStreamProductsImages as mLiveStreamProductsImages;
 use App\Models\LiveStreams as mLiveStreams;
 use App\Models\Stories as mStories;
 use App\Models\StoryMetrics as mStoryMetrics;
+use App\Models\Swipes as mSwipes;
 use App\Models\SwipeMetrics as mSwipeMetrics;
+use Illuminate\Database\Eloquent\Collection;
 use Browser;
 use FFMpeg\Coordinate\TimeCode;
 use FFMpeg\FFMpeg;
@@ -53,6 +55,7 @@ class API extends Controller
     const STORY_CACHE_TIME = 3;
     const CACHE_TTL_MEDIA = 3600;
     const CACHE_TTL_PRODUCTS = 1;
+    const CACHE_TTL_SWIPES = 3;
 
     const STORY_STATUS_DRAFT = 0;
     const STORY_STATUS_ACTIVE = 1;
@@ -61,6 +64,8 @@ class API extends Controller
 
     const STORY_NOT_PUBLISHED = 0;
     const STORY_PUBLISHED = 1;
+
+    const COUNT_CREATE_THUMBNAIL = 3;
 
     const MEDIA_RAW_BY_ID_URL = '/media/raw/id/';
     const MEDIA_THUMBNAIL_RAW_BY_ID_URL = '/media/raw/thumbnail/';
@@ -406,14 +411,99 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('The story could not be found.'),
             ];
-            if (config('app.debug')) {
-                $message->debug = __('Story not found in database.');
-            }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         return $story;
+    }
+
+    /**
+     * Get Swipe from database
+     * 
+     * @param object $r
+     * @param array $params
+     * 
+     * @return object
+     */
+    public static function getSwipe(string $swipe_id, ?object &$r = null): JsonResponse|mSwipes
+    {
+        $r = $r ?? self::INIT();
+
+        $cache_tag = 'swipe_by_id_' . $swipe_id;
+        $swipe = null;
+
+        try {
+            $swipe = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_SWIPES), function () use ($swipe_id) {
+                $swipes = new mSwipes();
+                return $swipes->getSwipeById($swipe_id);
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Could not get swipe data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($swipe === null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('The swipe could not be found.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $swipe;
+    }
+
+    /**
+     * Get Swipe from database
+     * 
+     * @param object $r
+     * @param array $params
+     * 
+     * @return object
+     */
+    public static function getSwipes(string $company_id, ?object &$r = null): JsonResponse|Collection
+    {
+        $r = $r ?? self::INIT();
+
+        $cache_tag = 'swipes_by_company_' . $company_id;
+        $swipes = null;
+
+        try {
+            $swipes = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_SWIPES), function () use ($company_id) {
+                $swipes = new mSwipes();
+                return $swipes->getSwipesByCompanyId($company_id);
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Cloud not get swipes data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($swipes === null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('No swipes found.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $swipes;
     }
 
     public static function story(object $story): object
@@ -908,8 +998,7 @@ class API extends Controller
                 }
 
                 try {
-                    # Create 10 thumbnails
-                    for ($i = 1; $i <= 10; $i++) {
+                    for ($i = 1; $i <= API::COUNT_CREATE_THUMBNAIL; $i++) {
                         $thumbnail = (object)[
                             'media' => null,
                             'original_name' => null,

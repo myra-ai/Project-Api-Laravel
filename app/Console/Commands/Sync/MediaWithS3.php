@@ -4,7 +4,6 @@ namespace App\Console\Commands\Sync;
 
 use Illuminate\Console\Command;
 use App\Models\LiveStreamMedias as mLiveStreamMedias;
-use App\Http\Controllers\API;
 use App\Jobs\SyncWithS3;
 
 class MediaWithS3 extends Command

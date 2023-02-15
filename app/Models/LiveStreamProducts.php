@@ -135,7 +135,7 @@ class LiveStreamProducts extends Authenticatable
                 } else {
                     return (object) [
                         'id' => $optimized->id,
-                        'media_id' => $optimized->parent_id,
+                        'media_id' => $i->media_id,
                         'url' => match ($optimized->s3_available) {
                             null => API::getMediaUrl($optimized->id),
                             default => API::getMediaCdnUrl($optimized->path)
