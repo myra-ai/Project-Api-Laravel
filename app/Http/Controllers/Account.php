@@ -24,7 +24,7 @@ class Account extends API
             'email' => ['required', 'email', 'max:255'],
             'phone_country' => ['required', 'string', 'size:2'],
             'phone_country_dial' => ['nullable', 'string', 'min:2', 'max:5'],
-            'phone' => ['required', 'string', 'min:4', 'max:32'],
+            'phone' => ['required', 'string', 'min:6', 'max:20'],
             'brand_name' => ['required', 'string', 'min:4', 'max:110'],
             'password' => ['required', 'string', 'min:6', 'max:100'],
             'password_confirmation' => ['nullable', 'string', 'min:6', 'max:100'],
@@ -34,38 +34,64 @@ class Account extends API
         }
 
         $params['name'] = isset($params['name']) ? trim($params['name']) : null;
-        $params['email'] = isset($params['email']) ? trim($params['email']) : null;
+        $params['email'] = isset($params['email']) ? strtolower(trim($params['email'])) : null;
         $params['phone_country'] = isset($params['phone_country']) ? trim($params['phone_country']) : null;
         $params['phone_country_dial'] = isset($params['phone_country_dial']) ? trim($params['phone_country_dial']) : null;
-        $params['phone'] = isset($params['phone']) ? trim($params['phone']) : null;
+        $params['phone'] = isset($params['phone']) ? trim(preg_replace('/[^0-9]/', '', $params['phone'])) : null;
         $params['brand_name'] = isset($params['brand_name']) ? trim($params['brand_name']) : null;
         $params['password'] = isset($params['password']) ? trim($params['password']) : null;
         $params['password_confirmation'] = isset($params['password_confirmation']) ? trim($params['password_confirmation']) : null;
 
-        if (isset($params['phone_country']) && !preg_match('/^[A-Za-z]+$/', $params['phone_country'])) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Phone country code must be only letters.'),
-            ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
-        } else {
-            $params['phone_country'] = strtoupper($params['phone_country']);
+        if ($params['phone'] !== null) {
+            if (strlen($params['phone']) < 6) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone number must be at least 6 characters long.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if ($params['phone_country'] === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country code is required.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if (!preg_match('/^[A-Za-z]+$/', $params['phone_country'])) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country code must be only letters.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            } else {
+                $params['phone_country'] = strtoupper($params['phone_country']);
+            }
+
+            if ($params['phone_country_dial'] === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country dial code is required.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if (!preg_match('/^\+[0-9]+$/', $params['phone_country_dial'])) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country dial code must be only numbers with a plus sign.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
         }
 
-        if (isset($params['phone']) && !preg_match('/^[0-9]+$/', $params['phone'])) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Phone number must be only numbers.'),
-            ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if (isset($params['password_confirmation']) && $params['password'] !== $params['password_confirmation']) {
+        if ($params['password_confirmation'] !== null && $params['password'] !== $params['password_confirmation']) {
             $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('Password confirmation does not match.'),
             ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         if (isset($params['terms'])) {
@@ -75,24 +101,16 @@ class Account extends API
                     'type' => 'error',
                     'message' => __('You must agree to the terms and conditions.'),
                 ];
-                return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
             }
         }
 
-        if (mLiveStreamCompanyUsers::where('email', '=', $params['email'])->exists()) {
+        if (mLiveStreamCompanyUsers::where('email', '=', $params['email'])->orWhere('phone', '=', $params['phone'])->exists()) {
             $r->messages[] = (object) [
                 'type' => 'error',
-                'message' => __('Email address already taken.'),
+                'message' => __('Email or phone number already taken.'),
             ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if (mLiveStreamCompanyUsers::where('phone', '=', $params['phone'])->exists()) {
-            $r->messages[] = (object) [
-                'type' => 'error',
-                'message' => __('Phone number already taken.'),
-            ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         if (mLiveStreamCompanies::where('name', '=', $params['brand_name'])->exists()) {
@@ -100,7 +118,7 @@ class Account extends API
                 'type' => 'error',
                 'message' => __('Brand name already taken.'),
             ];
-            return response()->json($r, Response::HTTP_UNPROCESSABLE_ENTITY);
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
         $company_id = Str::uuid()->toString();
@@ -124,10 +142,11 @@ class Account extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
+        $user_id = Str::uuid()->toString();
+
         try {
-            $company_user_id = Str::uuid()->toString();
             $company_user = new mLiveStreamCompanyUsers;
-            $company_user->id = $company_user_id;
+            $company_user->id = $user_id;
             $company_user->role = 1;
             $company_user->company_id = $company_id;
             $company_user->email = $params['email'];
@@ -139,6 +158,12 @@ class Account extends API
             $company_user->is_master = true;
             $company_user->save();
         } catch (\Exception $e) {
+            try {
+                $company->delete();
+            } catch (\Exception $e) {
+                //
+            }
+
             $message = (object)[
                 'type' => 'error',
                 'message' => __('Failed to create user account.'),
@@ -152,7 +177,36 @@ class Account extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $company_user = mLiveStreamCompanyUsers::find($company_user_id);
+        $check_interval = 300; // seconds
+        $timeout = 3; // seconds
+        $start = microtime(true);
+
+        // Wait for the company user to be created (This method is not ideal, but work with database replication)
+        while (true) {
+            $company_user = mLiveStreamCompanyUsers::find($user_id);
+            if ($company_user !== null) {
+                break;
+            }
+            if (microtime(true) - $start >= $timeout) {
+                try {
+                    $company->delete();
+                } catch (\Exception $e) {
+                    //
+                }
+
+                $message = (object) [
+                    'type' => 'error',
+                    'message' => __('Failed to create user account.'),
+                ];
+                if (config('app.debug')) {
+                    $message->debug = __('Company user could not be found after :timeout seconds', ['timeout' => $timeout]);
+                }
+                $r->messages[] = $message;
+                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+            usleep($check_interval * 1000);
+        }
+
         $token_expires_at = now()->addMinutes(config('session.lifetime'));
 
         if (($token = $company_user->generateToken($token_expires_at)) === null) {
@@ -173,7 +227,7 @@ class Account extends API
             'login_token' => $token,
             'token_expires_at' => $token_expires_at->toDateTimeString(),
             'company_id' => $company_id,
-            'company_user_id' => $company_user_id,
+            'company_user_id' => $user_id,
         ];
         return response()->json($r, Response::HTTP_OK);
     }
@@ -444,8 +498,11 @@ class Account extends API
             'token' => ['required', 'string', 'size:60'],
             'email' => ['required', 'string', 'email', 'max:100'],
             'name' => ['required', 'string', 'max:40'],
-            'password_confirmation' => ['required', 'string', 'min:4', 'max:100', 'same:password'],
-            'password' => ['required', 'string', 'min:4', 'max:100'],
+            'password_confirmation' => ['nullable', 'string', 'min:6', 'max:100', 'same:password'],
+            'password' => ['required', 'string', 'min:6', 'max:100'],
+            'phone_country' => ['nullable', 'string', 'size:2'],
+            'phone_country_dial' => ['nullable', 'string', 'min:2', 'max:5'],
+            'phone' => ['nullable', 'string', 'min:6', 'max:20'],
             'role' => ['nullable', 'numeric', 'in:1,0'],
             'avatar' => ['nullable', 'uuid', 'size:36', 'exists:livestream_medias,id'],
         ], $request->all())) instanceof JsonResponse) {
@@ -455,6 +512,16 @@ class Account extends API
         if (($company = API::getCompanyByToken($params['token'], $r)) instanceof JsonResponse) {
             return $company;
         }
+
+        $params['name'] = isset($params['name']) ? strtolower(trim($params['name'])) : null;
+        $params['email'] = isset($params['email']) ? strtolower(trim($params['email'])) : null;
+        $params['phone_country'] = isset($params['phone_country']) ? trim($params['phone_country']) : null;
+        $params['phone_country_dial'] = isset($params['phone_country_dial']) ? trim($params['phone_country_dial']) : null;
+        $params['phone'] = isset($params['phone']) ? trim(preg_replace('/[^0-9]/', '', $params['phone'])) : null;
+        $params['password'] = isset($params['password']) ? trim($params['password']) : null;
+        $params['password_confirmation'] = isset($params['password_confirmation']) ? trim($params['password_confirmation']) : null;
+        $params['role'] = isset($params['role']) ? trim($params['role']) : 0;
+        $params['avatar'] = isset($params['avatar']) ? trim($params['avatar']) : null;
 
         if (($company_user = API::getCompanyUserByEmail($params['email'], false, $r)) instanceof JsonResponse) {
             return $company_user;
@@ -468,17 +535,87 @@ class Account extends API
             return response()->json($r, Response::HTTP_UNAUTHORIZED);
         }
 
+        if ($params['password_confirmation'] !== null) {
+            if ($params['password'] !== $params['password_confirmation']) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Password confirmation does not match.'),
+                ];
+                return response()->json($r, Response::HTTP_UNAUTHORIZED);
+            }
+        }
+
+        if ($params['phone'] !== null) {
+            if (strlen($params['phone']) < 6) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone number must be at least 6 characters long.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if (($company_user = API::getCompanyUserByPhone($params['phone'], false, $r)) instanceof JsonResponse) {
+                return $company_user;
+            }
+
+            if ($company_user !== null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone number already exists.'),
+                ];
+                return response()->json($r, Response::HTTP_UNAUTHORIZED);
+            }
+
+            if ($params['phone_country'] === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country code is required.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if (!preg_match('/^[A-Za-z]+$/', $params['phone_country'])) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country code must be only letters.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            } else {
+                $params['phone_country'] = strtoupper($params['phone_country']);
+            }
+
+            if ($params['phone_country_dial'] === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country dial code is required.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            if (!preg_match('/^\+[0-9]+$/', $params['phone_country_dial'])) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Phone country dial code must be only numbers with a plus sign.'),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+        }
+
+        $user_id = Str::uuid()->toString();
+
         try {
             $company_user = new mLiveStreamCompanyUsers();
-            $company_user->id = Str::uuid()->toString();
+            $company_user->id = $user_id;
             $company_user->company_id = $company->id;
             $company_user->email = $params['email'];
             $company_user->password = Hash::make($params['password']);
             $company_user->name = $params['name'];
-            $company_user->role = $params['role'] ?? 0;
-            $company_user->avatar = $params['avatar'] ?? null;
+            $company_user->phone = $params['phone'];
+            $company_user->phone_country = $params['phone_country'];
+            $company_user->phone_country_dial = $params['phone_country_dial'];
+            $company_user->role = $params['role'];
+            $company_user->avatar = $params['avatar'];
             $company_user->save();
-            $company_user->refresh();
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -491,15 +628,13 @@ class Account extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $token_expires_at = now()->addMinutes(config('session.lifetime'));
-
         $r->messages[] = (object) [
             'type' => 'success',
             'message' => __('User has been created.'),
         ];
         $r->success = true;
         $r->data = (object) [
-            'login_token' => $company_user->generateToken($token_expires_at)
+            'id' => $user_id,
         ];
         return response()->json($r, Response::HTTP_OK);
     }

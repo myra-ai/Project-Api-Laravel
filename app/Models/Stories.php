@@ -182,4 +182,11 @@ class Stories extends Authenticatable
             ];
         });
     }
+
+    public function isAttachWith(string $swipe_id)
+    {
+        return $this->hasOne(SwipeGroups::class, 'story_id', 'id')
+            ->where('swipe_id', '=', $swipe_id)
+            ->exists();
+    }
 }

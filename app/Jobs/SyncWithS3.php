@@ -67,16 +67,11 @@ class SyncWithS3 implements ShouldQueue
         if ($s3Available === true) {
             Log::info('SyncWithS3: Media already synced, checking checksum');
 
-            try {
-                $s3Metadata = Storage::disk('s3')->getMetadata($this->media->path);
-                if ($s3Metadata['Metadata']['media_checksum'] !== $this->media->checksum) {
-                    Log::error('SyncWithS3: Media checksum mismatch');
-                    return false;
-                }
-            } catch (\Exception $e) {
-                Log::error('SyncWithS3: Media checksum mismatch');
-                return false;
-            }
+            //     $s3Metadata = Storage::disk('s3')->getMetadata($this->media->path);
+            //     if ($s3Metadata['Metadata']['media_checksum'] !== $this->media->checksum) {
+            //         Log::error('SyncWithS3: Media checksum mismatch');
+            //         return false;
+            //     }
 
             if (!$this->updateDatabase()) {
                 Log::error('SyncWithS3: Media database update failed');

@@ -36,7 +36,7 @@ class MediaWithS3 extends Command
 
             foreach ($medias as $media) {
                 $this->info("[::] Syncing media {$media->id} with S3");
-                if (SyncWithS3::dispatch($media)->onQueue('sync_with_s3')->onConnection('sync_with_s3')->delay(now()->addSeconds(1)) === false) {
+                if (SyncWithS3::dispatch($media)->delay(now()->addSeconds(1)) === false) {
                     $this->error("[!!] Failed to dispatch SyncWithS3 job for media {$media->id}");
                 } else {
                     $this->info("[OK] SyncWithS3 job dispatched for media {$media->id}");

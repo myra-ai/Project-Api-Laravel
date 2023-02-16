@@ -514,8 +514,8 @@ class API extends Controller
 
     public static function story(object $story): object
     {
-        $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 96;
-        $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 96;
+        $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 128;
+        $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 128;
         $params['thumbnail_mode'] = isset($params['thumbnail_mode']) ? $params['thumbnail_mode'] : 'fit';
         $params['thumbnail_keep_asp_ratio'] = isset($params['thumbnail_keep_asp_ratio']) ? filter_var($params['thumbnail_keep_asp_ratio'], FILTER_VALIDATE_BOOLEAN) : true;
         $params['thumbnail_quality'] = isset($params['thumbnail_quality']) ? intval($params['thumbnail_quality']) : 80;
@@ -1451,9 +1451,55 @@ class API extends Controller
 
         $company_user = null;
 
+        $cache_tag = 'company_user_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString();
+
         try {
-            $company_user = Cache::remember('company_user_by_email_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $email)->toString(), now()->addSeconds(API::CACHE_TTL), function () use ($email) {
+            $company_user = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($email) {
                 return mLiveStreamCompanyUsers::where('email', '=', $email)->first();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get user data.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        if ($skip_check_account && $company_user === null) {
+            $r->messages[] = (object) [
+                'type' => 'error',
+                'message' => __('User could not be found.'),
+            ];
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        if ($skip_check_account && $company_user->deleted_at !== null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('The user is excluded.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        return $company_user;
+    }
+
+    public static function getCompanyUserByPhone(string $phone, bool $skip_check_account = false, ?object &$r = null): ?object
+    {
+        $r = $r ?? self::INIT();
+
+        $company_user = null;
+
+        $cache_tag = 'company_user_by_phone_' . Uuid::uuid5(Uuid::NAMESPACE_DNS, $phone)->toString();
+
+        try {
+            $company_user = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($phone) {
+                return mLiveStreamCompanyUsers::where('phone', '=', $phone)->first();
             });
         } catch (\Exception $e) {
             $message = (object) [
