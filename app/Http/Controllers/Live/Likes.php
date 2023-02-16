@@ -53,7 +53,7 @@ class Likes extends API
                 Cache::put('story_by_id_' . $story->id, $story, now()->addSeconds(API::CACHE_TTL));
             }
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to add like.'),
             ];
@@ -133,7 +133,7 @@ class Likes extends API
                 }
             }
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to remove like.'),
             ];

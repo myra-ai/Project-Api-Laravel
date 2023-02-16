@@ -165,7 +165,7 @@ class LiveStreamCompanyUsers extends Authenticatable
             return null;
         }
 
-        return (object)[
+        return (object) [
             "height" => $media->height,
             "media_id" => $media->id,
             "mime" => $media->mime,

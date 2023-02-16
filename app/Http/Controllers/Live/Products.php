@@ -511,7 +511,7 @@ class Products extends API
             $has_token = isset($params['token']);
 
             $cache_tag = 'products_by_company_' . $company_id;
-            $cache_tag .= implode('_', $params);
+            $cache_tag .= sha1(implode('_', $params));
 
             $products = match ($has_token) {
                 true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($company_id, $params) {
@@ -619,7 +619,7 @@ class Products extends API
             $has_token = isset($params['token']);
 
             $cache_tag = 'products_by_stream_' . $stream_id;
-            $cache_tag .= implode('_', $params);
+            $cache_tag .= sha1(implode('_', $params));
 
             $products = match ($has_token) {
                 true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($stream_id, $params) {
@@ -708,7 +708,7 @@ class Products extends API
             $has_token = isset($params['token']);
 
             $cache_tag = 'products_by_story_' . $story_id;
-            $cache_tag .= implode('_', $params);
+            $cache_tag .= sha1(implode('_', $params));
 
             $products = match ($has_token) {
                 true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($story_id, $params) {
@@ -849,7 +849,7 @@ class Products extends API
             }
             $product->save();
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Product could not be updated.'),
             ];
@@ -928,7 +928,7 @@ class Products extends API
         try {
             $image->delete();
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Image could not be deleted.'),
             ];
@@ -969,7 +969,7 @@ class Products extends API
             $product->deleted_at = $now;
             $product->save();
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Product could not be deleted.'),
             ];

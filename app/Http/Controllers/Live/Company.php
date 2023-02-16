@@ -133,7 +133,7 @@ class Company extends API
             'type' => 'success',
             'message' => 'Company settings updated successfully.',
         ];
-        $r->data = (object)[
+        $r->data = (object) [
             'updated_at' => now()
         ];
         $r->success = true;

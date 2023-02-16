@@ -24,12 +24,12 @@ class Links extends API
         try {
             $link->increment('clicks');
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to redirect link.'),
             ];
             if (config('app.debug')) {
-                $message->debug = (object)[
+                $message->debug = (object) [
                     'message' => $e->getMessage(),
                 ];
             }

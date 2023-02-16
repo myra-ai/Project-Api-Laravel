@@ -54,7 +54,7 @@ class Stories extends API
 
             if ($params['media_id'] !== null) {
                 if (!mLiveStreamMedias::where('id', '=', $params['media_id'])->exists()) {
-                    $message = (object)[
+                    $message = (object) [
                         'type' => 'warning',
                         'message' => __('Invalid media ID.'),
                     ];
@@ -85,7 +85,7 @@ class Stories extends API
                 });
 
                 if (count($params['products']) === 0) {
-                    $message = (object)[
+                    $message = (object) [
                         'type' => 'warning',
                         'message' => __('No valid products found.'),
                     ];
@@ -103,12 +103,12 @@ class Stories extends API
                 }
             }
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to create story.'),
             ];
             if (config('app.debug')) {
-                $message->debug = (object)[
+                $message->debug = (object) [
                     'message' => $e->getMessage(),
                 ];
             }
@@ -215,12 +215,12 @@ class Stories extends API
             }
             $story->save();
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to update story.'),
             ];
             if (config('app.debug')) {
-                $message->debug = (object)[
+                $message->debug = (object) [
                     'message' => $e->getMessage(),
                 ];
             }
@@ -326,7 +326,7 @@ class Stories extends API
 
         try {
             $cache_tag = 'stories_' . $params['company_id'];
-            $cache_tag .= implode('_', $params);
+            $cache_tag .= sha1(implode('_', $params));
 
             $stories = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($params) {
                 return mStories::where('company_id', '=', $params['company_id'])
@@ -363,7 +363,7 @@ class Stories extends API
                 return mStories::where('company_id', '=', $params['company_id'])->count();
             });
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to get story list.'),
             ];

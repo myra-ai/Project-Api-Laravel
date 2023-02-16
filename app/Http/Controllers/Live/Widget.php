@@ -15,6 +15,8 @@ class Widget extends API
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
+            'swipe_id' => ['nullable', 'string', 'size:36', 'uuid'],
+            'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -23,8 +25,37 @@ class Widget extends API
             return $company;
         }
 
+        $params['company_id'] = isset($params['company_id']) ? trim($params['company_id']) : $company->id;
+        $params['stream_id'] = isset($params['stream_id']) ? trim($params['stream_id']) : null;
+        $params['swipe_id'] = isset($params['swipe_id']) ? trim($params['swipe_id']) : null;
+        $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
+
+        $dataset = [];
+
+        if (isset($params['company_id'])) {
+            $dataset['data-company-id'] = $params['company_id'];
+        }
+        if (isset($params['stream_id'])) {
+            $dataset['data-stream-id'] = $params['stream_id'];
+        }
+        if (isset($params['swipe_id'])) {
+            $dataset['data-swipe-id'] = $params['swipe_id'];
+        }
+        if (isset($params['story_id'])) {
+            $dataset['data-story-id'] = $params['story_id'];
+        }
+
+        $dataset = implode(' ', array_map(
+            function ($v, $k) {
+                return sprintf('%s="%s"', $k, $v);
+            },
+            $dataset,
+            array_keys($dataset)
+        ));
+
         $r->data = (object) [
-            'js' => '<div id="widget"></div><script type="application/javascript" src="' . asset("js/core/widget.js") . '" data-company-id="' . $company->id . '" async></script>',
+            'widget' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget.js" ' . $dataset . ' async></script>'),
+            'embed' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget.js" ' . $dataset . ' data-force-embed="true" async></script>'),
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);

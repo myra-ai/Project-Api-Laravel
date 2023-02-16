@@ -70,14 +70,15 @@ class Swipes extends Authenticatable
             ->first();
     }
 
-    public function createSwipe(array $params): Swipes
+    public function createSwipe(array $params, ?string &$id = null): Swipes
     {
+        $id = Str::uuid()->toString();
         return $this->create([
-            'id' => Str::uuid()->toString(),
+            'id' => $id,
             'company_id' => $params['company_id'],
             'title' => $params['title'],
             'status' => $params['status'],
-            'published' => false,
+            'published' => $params['published'],
         ])->fresh();
     }
 

@@ -129,12 +129,12 @@ class Account extends API
             $company->name = $params['brand_name'];
             $company->save();
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to create company.'),
             ];
             if (config('app.debug')) {
-                $message->debug = (object)[
+                $message->debug = (object) [
                     'message' => $e->getMessage(),
                 ];
             }
@@ -164,12 +164,12 @@ class Account extends API
                 //
             }
 
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to create user account.'),
             ];
             if (config('app.debug')) {
-                $message->debug = (object)[
+                $message->debug = (object) [
                     'message' => $e->getMessage(),
                 ];
             }

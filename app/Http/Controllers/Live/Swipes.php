@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Ramsey\Uuid\Uuid;
 
 class Swipes extends API
 {
@@ -17,10 +18,10 @@ class Swipes extends API
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-            'title' => ['required', 'string', 'max:60'],
-            'status' => ['nullable', 'string', 'in:0,draft,1,ready,2,active,3,archived'],
+            'title' => ['required', 'string', 'min:4', 'max:60'],
+            'status' => ['nullable', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
-            'story_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:stories,id'],
+            'stories' => ['nullable', 'string'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -34,10 +35,55 @@ class Swipes extends API
             default => API::SWIPE_STATUS_DRAFT,
         }
             : API::SWIPE_STATUS_DRAFT;
+        $params['stories'] = isset($params['stories']) ? trim($params['stories']) : null;
+        $params['published'] = isset($params['published']) ? filter_var($params['published'], FILTER_VALIDATE_BOOLEAN) : false;
+
+        if ($params['stories'] !== null) {
+            $stories = explode(';', $params['stories']);
+            $stories = array_map(function ($story) {
+                return trim($story);
+            }, $stories);
+            $stories = array_filter($stories, function ($story) {
+                return Uuid::isValid($story);
+            });
+
+            if (count($stories) > config('livestream.max_swipe_stories')) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Swipe cannot have more than :max stories', ['max' => config('livestream.max_swipe_stories')]),
+                ];
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+
+            $params['status'] = API::SWIPE_STATUS_READY;
+
+            if ($params['published']) {
+                $params['status'] = API::SWIPE_STATUS_ACTIVE;
+            }
+        } else {
+            $params['published'] = false;
+        }
 
         try {
-            $swipes = new mSwipes();
-            $swipes->createSwipe($params);
+            $swipe = new mSwipes();
+            $id = null;
+            $swipe = $swipe->createSwipe($params, $id);
+            if ($id === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => 'Could not create swipe',
+                ];
+                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            if ($params['stories'] !== null) {
+                foreach ($stories as $story) {
+                    $swipe->attachStory([
+                        'swipe_id' => $id,
+                        'story_id' => $story,
+                    ]);
+                }
+            }
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'error',
@@ -55,7 +101,7 @@ class Swipes extends API
             'message' => 'Swipe created',
         ];
         $r->data = (object) [
-            'id' => $swipes->id,
+            'id' => $id,
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
@@ -66,8 +112,8 @@ class Swipes extends API
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
-            'title' => ['nullable', 'string', 'max:60'],
-            'status' => ['nullable', 'string', 'in:0,draft,1,ready,2,active,3,archived'],
+            'title' => ['nullable', 'string', 'min:4', 'max:60'],
+            'status' => ['nullable', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;
@@ -195,7 +241,7 @@ class Swipes extends API
         }
 
         $cache_tag = 'swipes_' . $params['company_id'];
-        $cache_tag .= implode('_', $params);
+        $cache_tag .= sha1(implode('_', $params));
 
         $data = [];
 

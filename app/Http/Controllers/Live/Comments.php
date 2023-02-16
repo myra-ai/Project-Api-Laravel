@@ -163,13 +163,7 @@ class Comments extends API
             default => 'story_comments_list_' . $story->id,
         };
 
-        $cache_tag .= implode('_', [
-            $params['offset'],
-            $params['limit'],
-            $params['order_by'],
-            $params['order'],
-            $params['separe_pinned'],
-        ]);
+        $cache_tag .= sha1(implode('_', $params));
 
         try {
             $comments = Cache::remember($cache_tag, now()->addSeconds(API::COMMENTS_CACHE_TIME), function () use ($params) {
@@ -291,7 +285,7 @@ class Comments extends API
                 })
             };
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to get comments count.'),
             ];

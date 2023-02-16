@@ -281,7 +281,7 @@ class Metrics extends API
         try {
             $stream->increment('widget_views');
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget loads.'),
             ];
@@ -333,7 +333,7 @@ class Metrics extends API
         try {
             $stream->increment('widget_clicks');
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to add live stream widget clicks.'),
             ];
@@ -355,8 +355,8 @@ class Metrics extends API
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-            'start' => ['nullable', 'integer', 'min:0', 'max:90'],
-            'end' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'start' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'end' => ['nullable', 'integer', 'min:1', 'max:365'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
@@ -390,28 +390,29 @@ class Metrics extends API
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-            'start' => ['nullable', 'integer', 'min:0', 'max:90'],
-            'end' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'start' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'end' => ['nullable', 'integer', 'min:1', 'max:365'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
-            'pref_range' => ['nullable', 'string', 'in:today,yesterday,week,month,year'],
+            'range' => ['nullable', 'string', 'in:all,today,yesterday,week,month,year'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
-        $params['pref_range'] = isset($params['pref_range']) ? trim($params['pref_range']) : null;
+        $params['range'] = isset($params['range']) ? trim($params['range']) : null;
         $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.u');
-        $params['end'] = now()->subDays($params['end'] ?? 30)->format('Y-m-d H:i:s.u');
+        $params['end'] = now()->subDays($params['end'] ?? 7)->format('Y-m-d H:i:s.u');
         $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 30;
         $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
         $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
         $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
 
-        if ($params['pref_range'] !== null) {
-            $params['start'] = API::$pref_range->{$params['pref_range']}['start'];
-            $params['end'] = API::$pref_range->{$params['pref_range']}['end'];
+        if ($params['range'] !== null) {
+            $range = API::getMetricRange($params['range']);
+            $params['start'] = $range['start'];
+            $params['end'] = $range['end'];
         }
 
         $r->params = $params;
@@ -422,7 +423,7 @@ class Metrics extends API
         $metrics = [];
 
         try {
-            $metrics = Cache::remember($cache_tag, now()->addSeconds(API::METRICS_CACHE_TIME), function () use ($params) {
+            $metrics = Cache::remember($cache_tag, now()->addSeconds(0), function () use ($params) {
                 return mStoryMetrics::select('story_id', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
                     ->where(function ($query) use ($params) {
                         $query->where('created_at', '>=', $params['start'])
@@ -437,7 +438,7 @@ class Metrics extends API
                     });
             });
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => 'Error while getting story metrics',
             ];
@@ -458,7 +459,8 @@ class Metrics extends API
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
-            'range' => ['nullable', 'integer', 'min:10', 'max:86400'],
+            'interval' => ['nullable', 'integer', 'min:20', 'max:86400'],
+            'range' => ['nullable', 'string', 'in:all,today,yesterday,week,month,year'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'order_by' => ['nullable', 'string', 'in:load,click,like,unlike,dislike,undislike,view,share,comment'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
@@ -467,12 +469,21 @@ class Metrics extends API
             return $params;
         }
 
+        $params['range'] = isset($params['range']) ? trim($params['range']) : null;
+        $params['start'] = now()->subDays($params['start'] ?? 0)->format('Y-m-d H:i:s.u');
+        $params['end'] = now()->subDays($params['end'] ?? 7)->format('Y-m-d H:i:s.u');
         $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 30;
         $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
         $params['order_by'] = isset($params['order_by']) ? trim($params['order_by']) : 'view';
         $params['order'] = isset($params['order']) ? trim($params['order']) : 'desc';
         $params['story_id'] = isset($params['story_id']) ? trim($params['story_id']) : null;
-        $params['range'] = isset($params['range']) ? intval($params['range']) : 30;
+        $params['interval'] = isset($params['interval']) ? intval($params['interval']) : 60;
+
+        if ($params['range'] !== null) {
+            $range = API::getMetricRange($params['range']);
+            $params['start'] = $range['start'];
+            $params['end'] = $range['end'];
+        }
 
         $cache_tag = 'metrics_story_' . $params['story_id'] . '_';
         $cache_tag .= sha1(implode('_', $params));
@@ -480,10 +491,14 @@ class Metrics extends API
         $metrics = [];
 
         try {
-            $metrics = Cache::remember($cache_tag, now()->addSeconds(API::METRICS_CACHE_TIME), function () use ($params, &$r) {
+            $metrics = Cache::remember($cache_tag, now()->addSeconds(0), function () use ($params) {
                 return mStoryMetrics::select('created_at', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
-                    ->where('story_id', $params['story_id'])
-                    ->groupBy(DB::raw('UNIX_TIMESTAMP(`created_at`) DIV ' . $params['range']))
+                    ->where('story_id', '=', $params['story_id'])
+                    ->where(function ($qry) use ($params) {
+                        $qry->where('created_at', '>=', $params['start'])
+                            ->where('created_at', '<=', $params['end']);
+                    })
+                    ->groupBy(DB::raw('UNIX_TIMESTAMP(`created_at`) DIV ' . $params['interval']))
                     ->orderBy('created_at', $params['order'])
                     ->offset($params['offset'])
                     ->limit($params['limit'])
@@ -496,8 +511,19 @@ class Metrics extends API
                         return $item;
                     });
             });
+
+            // $total = Cache::remember($cache_tag . '_total', now()->addSeconds(0), function () use ($params) {
+            //     return mStoryMetrics::select('created_at', DB::raw('SUM(`' . $params['order_by'] . '`) as ' . $params['order_by'] . '_sum'))
+            //         ->where(function ($qry) use ($params) {
+            //             $qry->where('story_id', '=', $params['story_id'])
+            //                 ->where('created_at', '>=', $params['start'])
+            //                 ->where('created_at', '<=', $params['end']);
+            //         })
+            //         ->groupBy(DB::raw('UNIX_TIMESTAMP(`created_at`) DIV ' . $params['interval']))
+            //         ->count();
+            // });
         } catch (\Exception $e) {
-            $message = (object)[
+            $message = (object) [
                 'type' => 'error',
                 'message' => 'Error while getting story metrics',
             ];
@@ -509,6 +535,17 @@ class Metrics extends API
         }
 
         $r->data = $metrics;
+        $r->data_info = (object) [
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
+            'count' => count($metrics),
+            'total' => $total,
+            'interval' => $params['interval'],
+            'range' => [
+                'start' => $params['start'],
+                'end' => $params['end'],
+            ]
+        ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

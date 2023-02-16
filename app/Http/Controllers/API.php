@@ -301,9 +301,29 @@ class API extends Controller
         return substr(str_shuffle(str_repeat($pool, 4)), 0, $length);
     }
 
-    public static function getPrefRange(string $range): array
+    public static function getMetricRange(string $range): array
     {
         $pref_range = (object) [
+            'last_minute' => [
+                'start' => now()->subMinutes(1)->format('Y-m-d H:i:s.u'),
+                'end' => now()->format('Y-m-d H:i:s.u'),
+            ],
+            'last_hour' => [
+                'start' => now()->subHours(1)->format('Y-m-d H:i:s.u'),
+                'end' => now()->format('Y-m-d H:i:s.u'),
+            ],
+            'last_6_hours' => [
+                'start' => now()->subHours(6)->format('Y-m-d H:i:s.u'),
+                'end' => now()->format('Y-m-d H:i:s.u'),
+            ],
+            'last_12_hours' => [
+                'start' => now()->subHours(12)->format('Y-m-d H:i:s.u'),
+                'end' => now()->format('Y-m-d H:i:s.u'),
+            ],
+            'last_24_hours' => [
+                'start' => now()->subHours(24)->format('Y-m-d H:i:s.u'),
+                'end' => now()->format('Y-m-d H:i:s.u'),
+            ],
             'today' => [
                 'start' => now()->startOfDay()->format('Y-m-d H:i:s.u'),
                 'end' => now()->endOfDay()->format('Y-m-d H:i:s.u'),
@@ -316,13 +336,29 @@ class API extends Controller
                 'start' => now()->startOfWeek()->format('Y-m-d H:i:s.u'),
                 'end' => now()->endOfWeek()->format('Y-m-d H:i:s.u'),
             ],
+            'last_week' => [
+                'start' => now()->subWeeks(1)->startOfWeek()->format('Y-m-d H:i:s.u'),
+                'end' => now()->subWeeks(1)->endOfWeek()->format('Y-m-d H:i:s.u'),
+            ],
             'month' => [
                 'start' => now()->startOfMonth()->format('Y-m-d H:i:s.u'),
                 'end' => now()->endOfMonth()->format('Y-m-d H:i:s.u'),
             ],
+            'last_month' => [
+                'start' => now()->subMonths(1)->startOfMonth()->format('Y-m-d H:i:s.u'),
+                'end' => now()->subMonths(1)->endOfMonth()->format('Y-m-d H:i:s.u'),
+            ],
             'year' => [
                 'start' => now()->startOfYear()->format('Y-m-d H:i:s.u'),
                 'end' => now()->endOfYear()->format('Y-m-d H:i:s.u'),
+            ],
+            'last_year' => [
+                'start' => now()->subYears(1)->startOfYear()->format('Y-m-d H:i:s.u'),
+                'end' => now()->subYears(1)->endOfYear()->format('Y-m-d H:i:s.u'),
+            ],
+            'all' => [
+                'start' => now()->subYears(100)->format('Y-m-d H:i:s.u'),
+                'end' => now()->addYears(100)->format('Y-m-d H:i:s.u'),
             ],
         ];
 
@@ -1005,7 +1041,7 @@ class API extends Controller
 
                 try {
                     for ($i = 1; $i <= API::COUNT_CREATE_THUMBNAIL; $i++) {
-                        $thumbnail = (object)[
+                        $thumbnail = (object) [
                             'media' => null,
                             'original_name' => null,
                             'hash' => $base_checksum,
