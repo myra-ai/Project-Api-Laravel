@@ -54,8 +54,8 @@ class Widget extends API
         ));
 
         $r->data = (object) [
-            'widget' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget.js" ' . $dataset . ' async></script>'),
-            'embed' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget.js" ' . $dataset . ' data-force-embed="true" async></script>'),
+            'widget' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' async></script>'),
+            'embed' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' data-force-embed="true" async></script>'),
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
