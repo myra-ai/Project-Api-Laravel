@@ -76,11 +76,11 @@ Route::get('/product/group/{group_id}', [L\Products::class, 'getGroupByID']);
 Route::delete('/product/group/{group_id}', [L\Products::class, 'doDeleteGroup']);
 Route::get('/product/{product_id}', [L\Products::class, 'getByProductID']);
 Route::put('/product/{product_id}', [L\Products::class, 'productUpdate']);
-Route::delete('/product/{product_id}', [L\Products::class, 'productDelete']);
 Route::delete('/product/image/{image_id}', [L\Products::class, 'removeImage']);
+Route::delete('/product/{product_id}', [L\Products::class, 'productDelete']);
 
-Route::post('/media/{company_id}', [L\Medias::class, 'doUploadMediaByFile']);
-Route::post('/media/url/{company_id}', [L\Medias::class, 'doUploadMediaByUrl']);
+Route::post('/media/file', [L\Medias::class, 'doUploadMediaByFile']);
+Route::post('/media/url', [L\Medias::class, 'doUploadMediaByUrl']);
 Route::delete('/media/{media_id}', [L\Medias::class, 'doDeleteMedia']);
 Route::get('/media/{media_id}', [L\Medias::class, 'getMediaByID']);
 Route::post('/media/{media_id}/optimize', [L\Medias::class, 'doOptimizeMedia']);

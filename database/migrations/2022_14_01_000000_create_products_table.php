@@ -16,10 +16,10 @@ return new class extends Migration
         $product_max_title_length = (int) config('app.product_max_title_length', 100);
         $product_max_title_length = $product_max_title_length * 2 > 255 ? 255 : $product_max_title_length;
 
-        Schema::create('livestreams_products', function (Blueprint $table) use ($product_max_title_length) {
+        Schema::create('products', function (Blueprint $table) use ($product_max_title_length) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->index();
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->string('title', $product_max_title_length);
             $table->text('description')->nullable()->default(null);
             $table->float('price', 8, 2, true)->default(0);
@@ -41,6 +41,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestreams_products');
+        Schema::dropIfExists('products');
     }
 };

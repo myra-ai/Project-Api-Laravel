@@ -34,6 +34,7 @@ use Illuminate\Support\Str;
 use Imagick;
 use Ramsey\Uuid\Uuid;
 use App\Jobs\SyncWithS3;
+use App\Jobs\DeleteFile;
 
 class API extends Controller
 {
@@ -147,7 +148,7 @@ class API extends Controller
     public static function getExtensionByMime(string $mime): string
     {
         return match (strtolower($mime)) {
-            'image/jpeg' => 'jpg',
+            'image/jpeg' => 'jpeg',
             'image/jpg' => 'jpg',
             'image/png' => 'png',
             'image/gif' => 'gif',
@@ -206,7 +207,64 @@ class API extends Controller
             'audio/midi' => 'kar',
             'audio/midi' => 'rmi',
             'audio/x-m4a' => 'm4a',
-            default => throw new \Exception('Unknown image type: ' . $mime),
+            default => throw new \Exception('Unknown type: ' . $mime),
+        };
+    }
+
+    public static function getMimeByExtension(string $extension): string
+    {
+        return match (strtolower($extension)) {
+            'jpeg' => 'image/jpeg',
+            'jpg' => 'image/jpg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'bmp' => 'image/bmp',
+            'ico' => 'image/vnd.microsoft.icon',
+            'tiff' => 'image/tiff',
+            'xbm' => 'image/x-xbitmap',
+            'xpm' => 'image/x-xpixmap',
+            'xwd' => 'image/x-xwindowdump',
+            'pnm' => 'image/x-portable-anymap',
+            'pbm' => 'image/x-portable-bitmap',
+            'avi' => 'video/x-msvideo',
+            'mpeg' => 'video/mpeg',
+            'mov' => 'video/quicktime',
+            'wmv' => 'video/x-ms-wmv',
+            'asf' => 'video/x-ms-asf',
+            'asx' => 'video/x-ms-asf-plugin',
+            'avi' => 'video/x-msvideo',
+            'movie' => 'video/x-sgi-movie',
+            'mkv' => 'video/x-matroska',
+            'mng' => 'video/x-mng',
+            'wm' => 'video/x-ms-wm',
+            'flv' => 'video/flv',
+            'mp4' => 'video/mp4',
+            'ogv' => 'video/ogg',
+            'webm' => 'video/webm',
+            'm4v' => 'video/x-m4v',
+            '3gp' => 'video/3gpp',
+            '3g2' => 'video/3gpp2',
+            'mp3' => 'audio/mpeg',
+            'wma' => 'audio/x-ms-wma',
+            'wax' => 'audio/x-ms-wax',
+            'wvx' => 'audio/x-ms-wvx',
+            'aif' => 'audio/x-aiff',
+            'm3u' => 'audio/x-mpegurl',
+            'ram' => 'audio/x-pn-realaudio',
+            'rpm' => 'audio/x-pn-realaudio-plugin',
+            'ra' => 'audio/x-realaudio',
+            'wav' => 'audio/x-wav',
+            'mka' => 'audio/x-matroska',
+            'flac' => 'audio/flac',
+            'ogg' => 'audio/ogg',
+            'mid' => 'audio/midi',
+            'midi' => 'audio/midi',
+            'kar' => 'audio/midi',
+            'rmi' => 'audio/midi',
+            'm4a' => 'audio/x-m4a',
+            default => throw new \Exception('Unknown type: ' . $extension),
         };
     }
 
@@ -271,11 +329,10 @@ class API extends Controller
         };
     }
 
-    public static function getFileChecksum(string $file, bool $is_thumbnail): string
+    public static function getMediaChecksum(string $file, int $type): string
     {
-        $sha1 = sha1_file($file);
-        $sha1 = sha1($sha1 . ($is_thumbnail ? '1' : '0'));
-        return substr($sha1, 0, 8) . '-' . substr($sha1, 8, 4) . '-' . substr($sha1, 12, 4) . '-' . substr($sha1, 16, 4) . '-' . substr($sha1, 20, 12);
+        $hash = sha1(sha1($type) . ':' . file_get_contents($file));
+        return substr($hash, 0, 8) . '-' . substr($hash, 8, 4) . '-' . substr($hash, 12, 4) . '-' . substr($hash, 16, 4) . '-' . substr($hash, 20, 12);
     }
 
     public static function getUUIDWithData(mixed ...$data): string
@@ -774,19 +831,36 @@ class API extends Controller
         };
     }
 
-    public static function registerMediaFromFile($file, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
+    public static function registerMediaFromFile(string $company_id, mixed $file, ?int $type = null, ?string $alt = null, ?string $legend = null, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
         $original_name = $file->getClientOriginalName();
-        $extension = $file->getClientOriginalExtension();
-        $mime = $file->getMimeType();
-        $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
-        $base_checksum = Uuid::uuid5(Uuid::NAMESPACE_URL, $original_name . $extension . $mime . $type)->toString();
 
+        $extension = $file->getClientOriginalExtension() ?? null;
+        if ($extension === null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Could not determine the file type.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        $mime = $file->getMimeType() ?? null;
+        if ($mime === null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Could not determine the file type.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
+
+        $type = $type !== null ? $type : self::getTypeByMime($mime);
         $path_type = self::mediaPathType($type);
 
-        $max_upload_size = match ($type) {
+        if ($file->getSize() > match ($type) {
             self::MEDIA_TYPE_IMAGE => config('api.max_image_upload_size'),
             self::MEDIA_TYPE_IMAGE_THUMBNAIL => config('api.max_image_thumbnail_upload_size'),
             self::MEDIA_TYPE_IMAGE_AVATAR => config('api.max_image_avatar_upload_size'),
@@ -794,9 +868,7 @@ class API extends Controller
             self::MEDIA_TYPE_VIDEO => config('api.max_video_upload_size'),
             self::MEDIA_TYPE_AUDIO => config('api.max_audio_upload_size'),
             default => config('api.max_unknown_upload_size'),
-        };
-
-        if ($file->getSize() > $max_upload_size) {
+        }) {
             $message = (object) [
                 'type' => 'error',
                 'message' => __('File size is too large.'),
@@ -805,8 +877,49 @@ class API extends Controller
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
-        $path = $path_type . $base_checksum . '.' . $extension;
-        if ($file->storeAs('public', $path) === false) {
+        $tries = -1;
+        $max_tries = 5;
+
+        // Check temporary file_checksum is unique
+        while ($base_checksum = Str::uuid()->toString()) {
+            $tries++;
+            if ($tries > $max_tries) {
+                $message = (object) [
+                    'type' => 'error',
+                    'message' => __('Failed to generate a unique checksum.'),
+                ];
+                $r->messages[] = $message;
+                return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            $path = $path_type . $base_checksum . '.' . $extension;
+            $storage_path = storage_path('app/public/' . $path);
+
+            if (Storage::exists('public/' . $path)) {
+                $checksum = self::getMediaChecksum($storage_path, $type);
+
+                // Verify if the file already exists
+                if (($media = mLiveStreamMedias::where('checksum', '=', $checksum)->first()) !== null) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Media already exists.'),
+                    ];
+                    if (config('app.debug')) {
+                        $message->debug = 'Existing media: ' . $media->id . ' on ' . $media->path;
+                    }
+                    $r->messages[] = $message;
+                    return $media;
+                }
+
+                // Is same name but different file, so we need to generate a new checksum
+                continue;
+            }
+
+            // This checksum is unique, so we can use it
+            break;
+        }
+
+        if (!$file->storeAs('public', $path)) {
             $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to store file.'),
@@ -815,12 +928,34 @@ class API extends Controller
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        $path = storage_path('app/public/' . $path);
+        // Now check file is unique. If not, delete the file and return the existing media
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $legend, $r);
+        $checksum = self::getMediaChecksum($storage_path, $type);
+
+        // Verify if the file is unique
+        if (($media = mLiveStreamMedias::where('checksum', '=', $checksum)->first()) !== null) {
+            try {
+                if (Storage::disk('public')->exists($storage_path) && !Storage::delete($storage_path)) {
+                    DeleteFile::dispatch($storage_path)->delay(now()->addMinutes(5));
+                }
+            } catch (\Exception $e) {
+                DeleteFile::dispatch($storage_path)->delay(now()->addMinutes(5));
+            }
+            $message = (object) [
+                'type' => 'warning',
+                'message' => __('Media already exists.'),
+            ];
+            if (config('app.debug')) {
+                $message->debug = 'Existing media: ' . $media->id . ' on ' . $media->path;
+            }
+            $r->messages[] = $message;
+            return $media;
+        }
+
+        return self::registerMedia($company_id, $base_checksum, $storage_path, $original_name, $mime, $extension, $type, $alt, $legend, $r);
     }
 
-    public static function registerMediaFromUrl(string $url, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
+    public static function registerMediaFromUrl(string $company_id, string $url, ?int $type = null, ?string $alt = null, ?string $legend = null, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
@@ -853,7 +988,16 @@ class API extends Controller
         $original_name = basename($real_url);
         $original_name = preg_replace('/\?.*/', '', $original_name);
         $original_name = preg_replace('/#.*/', '', $original_name);
-        $mime = $http->header('Content-Type');
+        $mime = $http->header('Content-Type') ?? null;
+
+        if ($mime === null) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get image mime.'),
+            ];
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_BAD_REQUEST);
+        }
 
         try {
             $extension = self::getExtensionByMime($mime);
@@ -870,7 +1014,7 @@ class API extends Controller
         }
 
         try {
-            $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
+            $type = $type !== null ? $type : self::getTypeByMime($mime);
         } catch (\Exception $e) {
             $message = (object) [
                 'type' => 'warning',
@@ -887,7 +1031,7 @@ class API extends Controller
 
         $path_type = self::mediaPathType($type);
 
-        if (Storage::put('public/' . $path_type . $base_checksum . '.' . $extension, $http->body()) === false) {
+        if (!Storage::put('public/' . $path_type . $base_checksum . '.' . $extension, $http->body())) {
             $message = (object) [
                 'type' => 'error',
                 'message' => __('Failed to save image.'),
@@ -901,48 +1045,26 @@ class API extends Controller
 
         $path = storage_path('app/public/' . $path_type . $base_checksum . '.' . $extension);
 
-        return self::registerMedia($base_checksum, $path, $original_name, $mime, $is_thumbnail, $alt, $legend, $r);
+        return self::registerMedia($company_id, $base_checksum, $path, $original_name, $mime, $extension, $type, $alt, $legend, $r);
     }
 
-    public static function registerMedia(string $base_checksum, string $path, string $original_name, string $mime, bool $is_thumbnail = false, string $alt = '', string $legend = '', ?object &$r = null): object
+    public static function registerMedia(string $company_id, string $base_checksum, string $path, string $original_name, string $mime, string $extension, int $type, ?string $alt = null, ?string $legend = null, ?object &$r = null): object
     {
         $r = $r ?? self::INIT();
 
-        try {
-            $extension = self::getExtensionByMime($mime);
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'warning',
-                'message' => __('Failed to get image extension.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        try {
-            $type = $is_thumbnail === true ? self::MEDIA_TYPE_IMAGE_THUMBNAIL : self::getTypeByMime($mime);
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'warning',
-                'message' => __('Failed to get image type.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-        }
+        $id = Str::uuid()->toString();
 
         $path_type = self::mediaPathType($type);
-        $checksum = self::getFileChecksum($path, $is_thumbnail);
+        $checksum = self::getMediaChecksum($path, $type);
 
         if (($media = mLiveStreamMedias::where('checksum', '=', $checksum)->first()) !== null) {
             $message = (object) [
                 'type' => 'warning',
                 'message' => __('Media already exists.'),
             ];
+            if (config('app.debug')) {
+                $message->debug = 'Existing media: ' . $media->id . ' on ' . $media->path;
+            }
             $r->messages[] = $message;
             return $media;
         }
@@ -1038,13 +1160,20 @@ class API extends Controller
                     }
                     $r->messages[] = $message;
                 }
+                if (!isset($video)) {
+                    $message = (object) [
+                        'type' => 'warning',
+                        'message' => __('Failed to get video metadata.'),
+                    ];
+                    $r->messages[] = $message;
+                }
 
                 try {
                     for ($i = 1; $i <= API::COUNT_CREATE_THUMBNAIL; $i++) {
+                        $file_name = $base_checksum . '-' . str_pad($i, 5, '0', STR_PAD_LEFT);
                         $thumbnail = (object) [
-                            'media' => null,
                             'original_name' => null,
-                            'hash' => $base_checksum,
+                            'file_name' => $file_name,
                             'path' => null,
                             'checksum' => null,
                             'size' => 0,
@@ -1052,8 +1181,7 @@ class API extends Controller
                             'height' => null,
                         ];
 
-                        $thumbnail->original_name = $base_checksum . '-' . str_pad($i, 4, '0', STR_PAD_LEFT) . '.jpg';
-                        $thumbnail->path = 'images/thumbnails/' . $thumbnail->original_name;
+                        $thumbnail->path = 'images/thumbnails/' . $file_name . '.jpg';
                         $thumbnail_path = storage_path('app/public/' . $thumbnail->path);
 
                         try {
@@ -1069,18 +1197,42 @@ class API extends Controller
                             ];
                             if (config('app.debug')) {
                                 $message->debug = $e->getMessage();
+                                $message->debug_details = [
+                                    'threshold' => $i,
+                                    'thumbnail_path' => $thumbnail_path,
+                                    'thumbnail' => $thumbnail,
+                                ];
                             }
                             $r->messages[] = $message;
                             continue;
                         }
 
-                        $thumbnail->checksum = self::getFileChecksum($thumbnail_path, true);
+                        try {
+                            $img = new Imagick();
+                            $img->readImage($thumbnail_path);
+                            $width = $img->getImageWidth();
+                            $height = $img->getImageHeight();
+                            $quality = $img->getImageCompressionQuality();
+                            $img->destroy();
+                        } catch (\Exception $e) {
+                            $message = (object) [
+                                'type' => 'warning',
+                                'message' => __('Failed to get image dimensions.'),
+                            ];
+                            if (config('app.debug')) {
+                                $message->debug = $e->getMessage();
+                            }
+                            $r->messages[] = $message;
+                        }
+
+                        $thumbnail->checksum = self::getMediaChecksum($thumbnail_path, self::MEDIA_TYPE_IMAGE_THUMBNAIL);
                         $thumbnail->extension = 'jpg';
-                        $thumbnail->height = $video->getStreams()->videos()->first()->get('height');
-                        $thumbnail->mime = 'image/jpeg';
+                        $thumbnail->height = $height;
+                        $thumbnail->mime = 'image/jpg';
                         $thumbnail->size = filesize($thumbnail_path);
                         $thumbnail->type = self::MEDIA_TYPE_IMAGE_THUMBNAIL;
-                        $thumbnail->width = $video->getStreams()->videos()->first()->get('width');
+                        $thumbnail->width = $width;
+                        $thumbnail->quality = $quality;
 
                         $thumbnails[] = $thumbnail;
                     }
@@ -1098,36 +1250,12 @@ class API extends Controller
         }
 
         try {
-            $media = mLiveStreamMedias::where('checksum', '=', $checksum)->first();
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to check if image already exists.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        if ($media !== null) {
-            $message = (object) [
-                'type' => 'warning',
-                'message' => __('Media already exists.'),
-            ];
-            $r->messages[] = $message;
-            return $media;
-        }
-
-        $id = Str::uuid()->toString();
-
-        try {
             $media = new mLiveStreamMedias();
             $media->id = $id;
+            $media->company_id = $company_id;
             $media->checksum = $checksum;
             $media->original_name = $original_name;
-            $media->hash = $base_checksum;
+            $media->file_name = $base_checksum;
             $media->path = $path_type . $base_checksum . '.' . $extension;
             $media->policy = 'public';
             $media->type = $type;
@@ -1144,6 +1272,7 @@ class API extends Controller
             $media->alt = $alt;
             $media->legend = $legend;
             $media->created_at = now()->format('Y-m-d H:i:s.u');
+            $media->updated_at = null;
             $media->save();
             $media->id = $id;
 
@@ -1152,22 +1281,26 @@ class API extends Controller
             if (count($thumbnails) > 0) {
                 foreach ($thumbnails as $thumbnail) {
                     $thumbnail_id = Str::uuid()->toString();
+
                     $thumbnail_media = new mLiveStreamMedias();
                     $thumbnail_media->id = $thumbnail_id;
+                    $thumbnail_media->company_id = $company_id;
                     $thumbnail_media->parent_id = $id;
                     $thumbnail_media->checksum = $thumbnail->checksum;
                     $thumbnail_media->original_name = $thumbnail->original_name;
-                    $thumbnail_media->hash = $thumbnail->hash;
+                    $thumbnail_media->file_name = $thumbnail->file_name;
                     $thumbnail_media->path = $thumbnail->path;
                     $thumbnail_media->policy = 'public';
-                    $thumbnail_media->type =  $thumbnail->type;
-                    $thumbnail_media->mime =  $thumbnail->mime;
-                    $thumbnail_media->extension =  $thumbnail->extension;
+                    $thumbnail_media->type = $thumbnail->type;
+                    $thumbnail_media->mime = $thumbnail->mime;
+                    $thumbnail_media->extension = $thumbnail->extension;
                     $thumbnail_media->size = $thumbnail->size;
                     $thumbnail_media->width = $thumbnail->width;
                     $thumbnail_media->height = $thumbnail->height;
+                    $thumbnail_media->quality = $thumbnail->quality;
                     $thumbnail_media->duration = null;
                     $thumbnail_media->created_at = now()->format('Y-m-d H:i:s.u');
+                    $thumbnail_media->updated_at = null;
                     $thumbnail_media->save();
 
                     SyncWithS3::dispatch($thumbnail_id);

@@ -12,7 +12,7 @@ class LiveStreamMedias extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'livestream_medias';
+    protected $table = 'medias';
     protected $primaryKey = 'id';
     public $timestamps = true;
     protected $dateFormat = 'Y-m-d H:i:s.u';
@@ -24,10 +24,11 @@ class LiveStreamMedias extends Authenticatable
      */
     protected $fillable = [
         'id',
+        'company_id',
         'parent_id',
         'checksum',
         'original_name',
-        'hash',
+        'file_name',
         'original_url',
         'path',
         's3_available',
@@ -46,7 +47,25 @@ class LiveStreamMedias extends Authenticatable
         'channels',
         'alt',
         'legend',
+    ];
+
+    protected $hidden = [
+        'checksum',
+        'company_id',
+        'original_name',
+        'original_url',
+        's3_available',
+        'is_blurred',
+        'is_resized',
+        'policy',
+        'size',
+        'duration',
+        'bitrate',
+        'framerate',
+        'channels',
         'deleted_at',
+        'created_at',
+        'updated_at',
     ];
 
     /**
@@ -56,10 +75,11 @@ class LiveStreamMedias extends Authenticatable
      */
     protected $casts = [
         'id' => 'string',
+        'company_id' => 'string',
         'parent_id' => 'string',
         'checksum' => 'string',
         'original_name' => 'string',
-        'hash' => 'string',
+        'file_name' => 'string',
         'original_url' => Base64::class,
         'path' => 'string',
         'is_blurred' => 'boolean',

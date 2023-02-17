@@ -10,7 +10,7 @@ class LiveStreamProductGroups extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'livestream_product_groups';
+    protected $table = 'product_groups';
     protected $primaryKey = 'id';
     public $timestamps = true;
     protected $dateFormat = 'Y-m-d H:i:s.u';

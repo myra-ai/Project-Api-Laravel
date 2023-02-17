@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('swipes', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->nullable()->default(null);
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->string('title', 255)->nullable()->default(null);
             $table->tinyInteger('status')->default(0);
             $table->boolean('published')->default(false);

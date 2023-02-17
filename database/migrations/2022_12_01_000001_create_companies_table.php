@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_companies', function (Blueprint $table) {
+        Schema::create('companies', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('name', 100);
             $table->string('address', 255)->nullable()->default(null);
@@ -27,9 +27,9 @@ return new class extends Migration
             $table->char('text_chat_color', 8)->nullable()->default(null);
             $table->string('rtmp_key', 80)->nullable()->default(null);
             $table->uuid('avatar')->nullable()->default(null)->index();
-            $table->foreign('avatar')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('avatar')->references('id')->on('medias')->onDelete('cascade');
             $table->uuid('logo')->nullable()->default(null)->index();
-            $table->foreign('logo')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('logo')->references('id')->on('medias')->onDelete('cascade');
             $table->integer('font')->unsigned()->default(1);
             $table->boolean('stories_is_embedded')->default(true);
             $table->boolean('livestream_autoopen')->default(false);
@@ -45,6 +45,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_companies');
+        Schema::dropIfExists('companies');
     }
 };

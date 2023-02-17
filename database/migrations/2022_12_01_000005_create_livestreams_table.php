@@ -16,11 +16,11 @@ return new class extends Migration
         Schema::create('livestreams', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->index();
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->string('title', 255)->nullable()->default(null);
             $table->timestamp('sheduled_at')->nullable()->default(null);
             $table->uuid('thumbnail_id')->nullable()->default(null)->index();
-            $table->foreign('thumbnail_id')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('thumbnail_id')->references('id')->on('medias')->onDelete('cascade');
             $table->string('live_id', 96)->index();
             $table->string('stream_key', 64)->index();
             $table->string('latency_mode', 8)->default('ultralow');

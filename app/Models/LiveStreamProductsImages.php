@@ -10,7 +10,7 @@ class LiveStreamProductsImages extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'livestream_product_images';
+    protected $table = 'product_images';
     protected $primaryKey = 'id';
     public $timestamps = true;
 

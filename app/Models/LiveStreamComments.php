@@ -11,7 +11,7 @@ class LiveStreamComments extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'livestream_comments';
+    protected $table = 'comments';
     protected $primaryKey = 'id';
     protected $dateFormat = 'Y-m-d H:i:s.u';
     public $timestamps = true;

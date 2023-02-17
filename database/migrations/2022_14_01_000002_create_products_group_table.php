@@ -13,10 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_product_groups', function (Blueprint $table) {
+        Schema::create('product_groups', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('product_id')->nullable()->default(null)->index();
-            $table->foreign('product_id')->references('id')->on('livestreams_products')->onDelete('cascade');
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->uuid('stream_id')->nullable()->default(null)->index();
             $table->foreign('stream_id')->references('id')->on('livestreams')->onDelete('cascade');
             $table->uuid('story_id')->nullable()->default(null)->index();
@@ -33,6 +33,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_product_groups');
+        Schema::dropIfExists('product_groups');
     }
 };

@@ -136,7 +136,7 @@ class Stories extends Authenticatable
         }
 
         if (($optimized = API::mediaSized($thumbnail->id, $width, $height, $order_by, $order, $offset)) === null) {
-            MediaResizer::dispatch($thumbnail->id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur);
+            MediaResizer::dispatch($thumbnail->id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur,'webp');
         } else {
             return (object) [
                 'id' => $optimized->id,

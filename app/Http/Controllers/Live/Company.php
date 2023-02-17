@@ -15,7 +15,7 @@ class Company extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -33,7 +33,7 @@ class Company extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -78,7 +78,7 @@ class Company extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'primary_color' => ['nullable', 'string', 'regex:/^[a-fA-F0-9]{6}$/'],
             'cta_color' => ['nullable', 'string', 'regex:/^[a-fA-F0-9]{6}$/'],
             'accent_color' => ['nullable', 'string', 'regex:/^[a-fA-F0-9]{6}$/'],
@@ -86,8 +86,8 @@ class Company extends API
             'font' => ['nullable', 'integer', 'min:0', 'max:23'],
             'stories_is_embedded' => ['nullable', 'boolean'],
             'livestream_autoopen' => ['nullable', 'boolean'],
-            'avatar' => ['nullable', 'string', 'uuid', 'exists:livestream_medias,id'],
-            'logo' => ['nullable', 'string', 'uuid', 'exists:livestream_medias,id'],
+            'avatar' => ['nullable', 'string', 'uuid', 'exists:medias,id'],
+            'logo' => ['nullable', 'string', 'uuid', 'exists:medias,id'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }

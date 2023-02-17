@@ -15,7 +15,7 @@ class LiveStreamProducts extends Authenticatable
 {
     use Notifiable, HasFactory;
 
-    protected $table = 'livestreams_products';
+    protected $table = 'products';
     protected $primaryKey = 'id';
     public $timestamps = true;
     protected $dateFormat = 'Y-m-d H:i:s.u';
@@ -102,7 +102,7 @@ class LiveStreamProducts extends Authenticatable
                 }
 
                 return (object) [
-                    'id' => $i->media_id,
+                    'id' => $i->id,
                     'media_id' => $media->id,
                     'url' => match ($media->s3_available) {
                         null => API::getMediaUrl($media->id),
@@ -130,11 +130,12 @@ class LiveStreamProducts extends Authenticatable
                 }
 
                 if (($optimized = API::mediaSized($i->media_id, $width, $height, $order_by, $order, $offset)) === null) {
-                    MediaResizer::dispatch($i->media_id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur);
+                    MediaResizer::dispatch($i->media_id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur, 'webp');
                 } else {
                     return (object) [
-                        'id' => $optimized->id,
-                        'media_id' => $i->media_id,
+                        'id' => $i->id,
+                        'media_id' => $media->id,
+                        'optimized_id' => $optimized->id,
                         'url' => match ($optimized->s3_available) {
                             null => API::getMediaUrl($optimized->id),
                             default => API::getMediaCdnUrl($optimized->path)
@@ -147,7 +148,7 @@ class LiveStreamProducts extends Authenticatable
                 }
 
                 return (object) [
-                    'id' => $i->media_id,
+                    'id' => $i->id,
                     'media_id' => $media->id,
                     'url' => match ($media->s3_available) {
                         null => API::getMediaUrl($media->id),
@@ -196,16 +197,16 @@ class LiveStreamProducts extends Authenticatable
 
     public function getProductsByStreamID(string $stream_id): mixed
     {
-        return $this->join('livestream_product_groups', 'livestream_product_groups.product_id', '=', 'livestreams_products.id')
-            ->where('livestream_product_groups.stream_id', $stream_id)
-            ->select('livestreams_products.*', 'livestream_product_groups.id as group_id');
+        return $this->join('product_groups', 'product_groups.product_id', '=', 'products.id')
+            ->where('product_groups.stream_id', $stream_id)
+            ->select('products.*', 'product_groups.id as group_id');
     }
 
     public function getProductsByStoryID(string $story_id): mixed
     {
-        return $this->join('livestream_product_groups', 'livestream_product_groups.product_id', '=', 'livestreams_products.id')
-            ->where('livestream_product_groups.story_id', $story_id)
-            ->select('livestreams_products.*', 'livestream_product_groups.id as group_id');
+        return $this->join('product_groups', 'product_groups.product_id', '=', 'products.id')
+            ->where('product_groups.story_id', $story_id)
+            ->select('products.*', 'product_groups.id as group_id');
     }
 
     public function getGroups()

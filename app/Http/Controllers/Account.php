@@ -504,7 +504,7 @@ class Account extends API
             'phone_country_dial' => ['nullable', 'string', 'min:2', 'max:5'],
             'phone' => ['nullable', 'string', 'min:6', 'max:20'],
             'role' => ['nullable', 'numeric', 'in:1,0'],
-            'avatar' => ['nullable', 'uuid', 'size:36', 'exists:livestream_medias,id'],
+            'avatar' => ['nullable', 'uuid', 'size:36', 'exists:medias,id'],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }

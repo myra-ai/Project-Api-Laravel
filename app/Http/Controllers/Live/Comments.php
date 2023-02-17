@@ -15,7 +15,7 @@ class Comments extends API
     public function addComment(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'text' => ['required', 'string', 'min:4', 'max:600'],
@@ -118,7 +118,7 @@ class Comments extends API
     public function getComments(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'offset' => ['nullable', 'integer', 'min:0'],

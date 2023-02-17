@@ -13,10 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_company_tokens', function (Blueprint $table) {
+        Schema::create('tokens', function (Blueprint $table) {
             $table->string('token', 60)->primary();
             $table->uuid('user_id')->index()->nullable()->default(null);
-            $table->foreign('user_id')->references('id')->on('livestream_company_users')->onDelete('cascade');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->timestamp('expires_at', 6)->index()->useCurrent();
             $table->timestamps(6);
         });
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_company_tokens');
+        Schema::dropIfExists('tokens');
     }
 };

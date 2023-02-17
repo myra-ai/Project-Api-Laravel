@@ -16,9 +16,9 @@ return new class extends Migration
         Schema::create('stories', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->index();
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->uuid('media_id')->nullable()->default(null)->index();
-            $table->foreign('media_id')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('media_id')->references('id')->on('medias')->onDelete('cascade');
             $table->string('title', 255);
             $table->boolean('publish')->default(false);
             $table->string('status', 16)->default('DRAFT');

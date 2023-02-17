@@ -13,12 +13,12 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_product_images', function (Blueprint $table) {
+        Schema::create('product_images', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('product_id')->nullable()->default(null)->index();
-            $table->foreign('product_id')->references('id')->on('livestreams_products')->onDelete('cascade');
+            $table->foreign('product_id')->references('id')->on('products')->onDelete('cascade');
             $table->uuid('media_id')->nullable()->default(null)->index();
-            $table->foreign('media_id')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('media_id')->references('id')->on('medias')->onDelete('cascade');
             $table->timestamps(6);
         });
     }
@@ -30,6 +30,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_product_images');
+        Schema::dropIfExists('product_images');
     }
 };

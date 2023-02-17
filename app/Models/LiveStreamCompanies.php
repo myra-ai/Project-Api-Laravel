@@ -11,7 +11,7 @@ class LiveStreamCompanies extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    protected $table = 'livestream_companies';
+    protected $table = 'companies';
     protected $primaryKey = 'id';
     protected $dateFormat = 'Y-m-d H:i:s.u';
     public $timestamps = true;

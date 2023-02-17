@@ -13,7 +13,7 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_comments', function (Blueprint $table) {
+        Schema::create('comments', function (Blueprint $table) {
             $table->id();
             $table->uuid('stream_id')->nullable()->default(null)->index();
             $table->foreign('stream_id')->references('id')->on('livestreams')->onDelete('cascade');
@@ -23,7 +23,6 @@ return new class extends Migration
             $table->string('name', 255);
             $table->string('email', 255)->index();
             $table->bigInteger('parent_id')->unsigned()->nullable()->index();
-            $table->foreign('parent_id')->references('id')->on('livestream_comments')->onDelete('cascade');
             $table->boolean('pinned')->default(false);
             $table->boolean('is_streammer')->default(false);
             $table->bigInteger('likes')->unsigned()->default(0);
@@ -32,6 +31,10 @@ return new class extends Migration
             $table->timestamp('modified_at', 6)->nullable()->default(null);
             $table->timestamp('deleted_at', 6)->nullable()->default(null);
             $table->timestamps(6);
+        });
+
+        Schema::table('comments', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('comments')->onDelete('cascade');
         });
     }
 
@@ -42,6 +45,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('streams_comments');
+        Schema::dropIfExists('comments');
     }
 };

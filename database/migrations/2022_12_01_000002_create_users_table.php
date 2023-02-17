@@ -13,10 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('livestream_company_users', function (Blueprint $table) {
+        Schema::create('users', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('company_id')->nullable()->default(null)->index();
-            $table->foreign('company_id')->references('id')->on('livestream_companies')->onDelete('cascade');
+            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
             $table->json('permissions')->nullable()->default(null);
             $table->integer('role')->default(0)->index();
             $table->string('name', 110)->index();
@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('phone_country_dial', 5)->nullable()->default(null)->index();
             $table->string('phone', 80)->nullable()->default(null)->unique();
             $table->uuid('avatar')->nullable()->default(null)->index();
-            $table->foreign('avatar')->references('id')->on('livestream_medias')->onDelete('cascade');
+            $table->foreign('avatar')->references('id')->on('medias')->onDelete('cascade');
             $table->string('address', 255)->nullable()->default(null);
             $table->string('city', 80)->nullable()->default(null);
             $table->string('state', 80)->nullable()->default(null);
@@ -48,6 +48,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_company_users');
+        Schema::dropIfExists('users');
     }
 };

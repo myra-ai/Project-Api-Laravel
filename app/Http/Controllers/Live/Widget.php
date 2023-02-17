@@ -12,7 +12,7 @@ class Widget extends API
     public function getWidget(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'swipe_id' => ['nullable', 'string', 'size:36', 'uuid'],

@@ -10,7 +10,7 @@ class LiveStreamCompanyTokens extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    protected $table = 'livestream_company_tokens';
+    protected $table = 'tokens';
     protected $primaryKey = 'token';
     protected $dateFormat = 'Y-m-d H:i:s.u';
     public $timestamps = true;

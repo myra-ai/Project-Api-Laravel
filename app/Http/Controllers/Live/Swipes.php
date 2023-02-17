@@ -16,8 +16,8 @@ class Swipes extends API
     public function doCreate(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
-            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
+            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:companies,id'],
             'title' => ['required', 'string', 'min:4', 'max:60'],
             'status' => ['nullable', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
@@ -110,7 +110,7 @@ class Swipes extends API
     public function doUpdate(Request $request, ?string $swipe_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
             'title' => ['nullable', 'string', 'min:4', 'max:60'],
             'status' => ['nullable', 'in:0,draft,1,ready,2,active,3,archived'],
@@ -177,7 +177,7 @@ class Swipes extends API
     public function doDelete(Request $request, ?string $swipe_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;
@@ -220,8 +220,8 @@ class Swipes extends API
     public function getListByCompanyId(Request $request, ?string $company_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:livestream_companies,id'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:companies,id'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'order_by' => ['nullable', 'string', 'in:created_at,updated_at'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
             'offset' => ['nullable', 'integer', 'min:0'],
@@ -285,7 +285,7 @@ class Swipes extends API
     {
         if (($params = API::doValidate($r, [
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'show_attached' => ['nullable', new strBoolean],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;

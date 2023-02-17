@@ -13,6 +13,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Intervention\Image\Facades\Image;
+use Illuminate\Support\Facades\Storage;
 
 class MediaResizer implements ShouldQueue
 {
@@ -23,7 +24,7 @@ class MediaResizer implements ShouldQueue
      *
      * @return void
      */
-    public function __construct(public string $media_id, public int $width, public int $height, public string $mode, public bool $keep_aspect_radio, public int $quality, public bool $blur)
+    public function __construct(public string $media_id, public int $width, public int $height, public string $mode, public bool $keep_aspect_radio, public ?int $quality = null, public ?bool $blur = null, public ?string $format = null)
     {
         //
     }
@@ -40,6 +41,16 @@ class MediaResizer implements ShouldQueue
             Log::error('MediaResizer: Media not found');
             return;
         }
+
+        if (!Storage::disk('public')->exists($media->path)) {
+            if (!Storage::disk('s3')->exists($media->path)) {
+                Log::error('MediaResizer: Media not found on S3 and not in local storage');
+                return;
+            }
+            Storage::disk('public')->put($media->path, Storage::disk('s3')->get($media->path));
+            Log::info('MediaResizer: Media found on S3 and downloaded to local storage');
+        }
+
         $resized = mLiveStreamMedias::where('parent_id', '=', $media->id)
             ->where('width', '=', $this->width)
             ->where('height', '=', $this->height)
@@ -53,8 +64,19 @@ class MediaResizer implements ShouldQueue
 
         Log::info('MediaResizer: Resizing ' . $media->id);
 
+        $media->quality = is_numeric($media->quality) ? $media->quality : 80;
+        $media->quality = $media->quality < 50 ? 50 : $media->quality;
+        $media->quality = $media->quality > 100 ? 100 : $media->quality;
+
+        $format = $this->format !== null ? $this->format : $media->extension;
+        $quality = $this->quality !== null ? $this->quality : $media->quality;
+        $media->extension = $format;
+        $media->quality = $quality;
+        $media->mime = API::getMimeByExtension($format);
+
         $base_path = storage_path('app/public/' . $media->path);
-        $path = API::mediaPathType($media->type) . $media->hash . '_' . $this->width . 'x' . $this->height . '.' . $media->extension;
+        $file_name = $media->file_name . '_' . $this->width . 'x' . $this->height;
+        $path = API::mediaPathType($media->type) . $file_name . '.' . $format;
         $resized_path = storage_path('app/public/' . $path);
 
         $image = Image::make($base_path);
@@ -65,20 +87,19 @@ class MediaResizer implements ShouldQueue
             $constraint->upsize();
         });
 
-        $media->quality = is_numeric($media->quality) ? $media->quality : 80;
-        $media->quality = $media->quality < 50 ? 50 : $media->quality;
-        $media->quality = $media->quality > 100 ? 100 : $media->quality;
 
-        if ($image->save($resized_path, $media->quality, $media->extension)) {
-            $checksum = API::getFileChecksum($resized_path, $media->type === API::MEDIA_TYPE_IMAGE_THUMBNAIL ? true : false);
+
+        if ($image->save($resized_path, $quality, $format)) {
+            $checksum = API::getMediaChecksum($resized_path, $media->type);
             $resized_id = Str::uuid()->toString();
 
             mLiveStreamMedias::create([
                 'id' => $resized_id,
+                'company_id' => $media->company_id,
                 'parent_id' => $media->id,
                 'checksum' => $checksum,
                 'original_name' => null,
-                'hash' => null,
+                'file_name' => $file_name,
                 'original_url' => null,
                 'path' => $path,
                 's3_available' => null,

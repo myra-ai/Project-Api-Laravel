@@ -35,12 +35,13 @@ return new class extends Migration
             Log::info('Created directory: public/unknown');
         }
 
-        Schema::create('livestream_medias', function (Blueprint $table) {
+        Schema::create('medias', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->uuid('company_id')->index();
             $table->uuid('parent_id')->nullable()->default(null)->index();
             $table->uuid('checksum')->unique();
-            $table->string('original_name', 255)->nullable()->default(null);
-            $table->string('hash', 128)->nullable()->default(null);
+            $table->text('original_name')->nullable()->default(null);
+            $table->text('file_name')->nullable()->default(null);
             $table->text('original_url')->nullable()->default(null);
             $table->string('path')->nullable()->default(null)->index();
             $table->timestamp('s3_available', 6)->nullable()->default(null)->comment('When value is null, the file is not available on S3');
@@ -64,8 +65,8 @@ return new class extends Migration
             $table->timestamps(6);
         });
 
-        Schema::table('livestream_medias', function (Blueprint $table) {
-            $table->foreign('parent_id')->references('id')->on('livestream_medias')->onDelete('cascade');
+        Schema::table('medias', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('medias')->onDelete('cascade');
         });
     }
 
@@ -76,6 +77,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('livestream_medias');
+        Schema::dropIfExists('medias');
     }
 };

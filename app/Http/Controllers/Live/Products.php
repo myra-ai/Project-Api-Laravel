@@ -21,7 +21,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'title' => ['required', 'string', 'min:4', 'max:110'],
             'link' => ['nullable', 'string', 'url', 'max:300'],
             'price' => ['required', 'numeric', 'min:0'],
@@ -29,7 +29,7 @@ class Products extends API
             'currency' => ['nullable', 'string', 'size:3', 'in:' . implode(',', API::$valid_currencies)],
             'description' => ['nullable', 'string', 'max:2000'],
             'images' => ['nullable', 'string'],
-            'images_url' => ['nullable', 'array', 'min:1', 'max:10'],
+            'images_url' => ['nullable', 'string'],
             'get_product' => ['nullable',  new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
@@ -44,6 +44,7 @@ class Products extends API
         $params['price'] = isset($params['price']) ? (float) $params['price'] : 0;
         $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
         $params['link'] = isset($params['link']) ? trim($params['link']) : null;
+        $params['images_url'] = isset($params['images_url']) ? trim($params['images_url']) : null;
 
         try {
             $data = [
@@ -134,7 +135,8 @@ class Products extends API
                 }
             }
 
-            if (isset($params['images_url'])) {
+            if ($params['images_url'] !== null) {
+                $params['images_url'] = explode(';', $params['images_url']);
                 $params['images_url'] = array_map(function ($image) {
                     return trim($image);
                 }, $params['images_url']);
@@ -160,7 +162,7 @@ class Products extends API
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
                 foreach ($params['images_url'] as $url) {
-                    if (($media = API::registerMediaFromUrl($url, r: $r)) instanceof JsonResponse) {
+                    if (($media = API::registerMediaFromUrl($params['company_id'], $url, r: $r)) instanceof JsonResponse) {
                         return $media;
                     }
 
@@ -251,7 +253,7 @@ class Products extends API
     public function addStreamOrStoryProduct(Request $request, ?string $product_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
@@ -359,7 +361,7 @@ class Products extends API
     public function removeStreamOrStoryProduct(Request $request, ?string $product_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
             'stream_id' => ['nullable', 'string', 'size:36', 'uuid'],
             'story_id' => ['nullable', 'string', 'size:36', 'uuid'],
@@ -449,7 +451,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'group_ip' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['group_ip' => $group_ip])) instanceof JsonResponse) {
             return $params;
         }
@@ -485,7 +487,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'company_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
@@ -501,8 +503,8 @@ class Products extends API
         $products_total = 0;
 
         try {
-            $params['offset'] = isset($params['offset']) ? $params['offset'] : 0;
-            $params['limit'] = isset($params['limit']) ? $params['limit'] : 80;
+            $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
+            $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 80;
             $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
             $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
             $params['groups'] = isset($params['groups']) ? filter_var($params['groups'], FILTER_VALIDATE_BOOLEAN) : false;
@@ -585,8 +587,8 @@ class Products extends API
         $r->data = $products;
 
         $r->data_info = [
-            'offset' => isset($params['offset']) ? $params['offset'] : 0,
-            'limit' => isset($params['limit']) ? $params['limit'] : 50,
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
             'count' => count($products),
             'total' => $products_total,
         ];
@@ -599,7 +601,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'stream_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
@@ -686,7 +688,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
@@ -774,7 +776,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -795,7 +797,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'status' => ['nullable', 'integer', 'min:0', 'max:1'],
             'currency' => ['nullable', 'string', 'size:3', 'in:' . implode(',', API::$valid_currencies)],
             'description' => ['nullable', 'string', 'max:2000'],
@@ -879,7 +881,7 @@ class Products extends API
         if (($params = API::doValidate($r, [
             'media_id' => ['required', 'string', 'size:36', 'uuid'],
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['media_id' => $media_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -916,7 +918,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'image_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['image_id' => $image_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -954,7 +956,7 @@ class Products extends API
     {
         if (($params = API::doValidate($r, [
             'product_id' => ['required', 'string', 'size:36', 'uuid'],
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
         ], $request->all(), ['product_id' => $product_id])) instanceof JsonResponse) {
             return $params;
         }

@@ -354,7 +354,7 @@ class Metrics extends API
     public function getTopStreams(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'start' => ['nullable', 'integer', 'min:0', 'max:365'],
             'end' => ['nullable', 'integer', 'min:1', 'max:365'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
@@ -389,7 +389,7 @@ class Metrics extends API
     public function getTopStories(Request $request): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'start' => ['nullable', 'integer', 'min:0', 'max:365'],
             'end' => ['nullable', 'integer', 'min:1', 'max:365'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
@@ -457,7 +457,7 @@ class Metrics extends API
     public function getStoryMetric(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:livestream_company_tokens,token'],
+            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:30'],
             'interval' => ['nullable', 'integer', 'min:20', 'max:86400'],
             'range' => ['nullable', 'string', 'in:all,today,yesterday,week,month,year'],
