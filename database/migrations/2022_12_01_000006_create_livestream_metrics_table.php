@@ -17,6 +17,8 @@ return new class extends Migration
             $table->id();
             $table->uuid('stream_id')->index();
             $table->foreign('stream_id')->references('id')->on('livestreams')->onDelete('cascade');
+            $table->uuid('media_id')->index();
+            $table->foreign('media_id')->references('id')->on('medias')->onDelete('cascade');
             $table->timestamp('created_at', 6)->useCurrent()->index();
             $table->string('ip', 128)->nullable()->default(null)->index();
             $table->string('region', 80)->nullable()->default(null)->index();

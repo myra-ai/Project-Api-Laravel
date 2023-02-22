@@ -23,9 +23,15 @@ class Links extends Authenticatable
     protected $fillable = [
         'id',
         'url',
-        'clicks',
         'checksum',
         'deleted_at',
+    ];
+
+    protected $hidden = [
+        'checksum',
+        'deleted_at',
+        'created_at',
+        'updated_at',
     ];
 
     /**
@@ -36,16 +42,9 @@ class Links extends Authenticatable
     protected $casts = [
         'id' => 'string',
         'url' => Base64::class,
-        'clicks' => 'integer',
         'checksum' => 'string',
         'deleted_at' => 'timestamp',
-    ];
-
-    protected $hidden = [
-        'clicks',
-        'checksum',
-        'created_at',
-        'deleted_at',
-        'updated_at',
+        'created_at' => 'timestamp',
+        'updated_at' => 'timestamp',
     ];
 }

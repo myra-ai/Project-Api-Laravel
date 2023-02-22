@@ -304,14 +304,15 @@ class Stories extends API
             'thumbnail_quality' => ['nullable', 'integer', 'min:1', 'max:100'],
             'thumbnail_blur' => ['nullable', new strBoolean],
             'attached_with' => ['nullable', 'string', 'uuid', 'size:36'],
+            'attached_order' => ['nullable', 'string', 'in:asc,desc'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
 
         $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
         $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 80;
-        $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
-        $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+        $params['order_by'] = isset($params['order_by']) ? strtolower(trim($params['order_by'])) : 'created_at';
+        $params['order'] = isset($params['order']) ? strtoupper(trim($params['order'])) : 'asc';
         $params['only_published'] = isset($params['only_published']) ? filter_var($params['only_published'], FILTER_VALIDATE_BOOLEAN) : true;
         $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 128;
         $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 128;
@@ -320,6 +321,7 @@ class Stories extends API
         $params['thumbnail_quality'] = isset($params['thumbnail_quality']) ? intval($params['thumbnail_quality']) : 80;
         $params['thumbnail_blur'] = isset($params['thumbnail_blur']) ? filter_var($params['thumbnail_blur'], FILTER_VALIDATE_BOOLEAN) : false;
         $params['attached_with'] = isset($params['attached_with']) ? trim($params['attached_with']) : null;
+        $params['attached_order'] = isset($params['attached_order']) ? strtolower(trim($params['attached_order'])) : null;
 
         $stories_count = 0;
         $stories = [];
@@ -329,22 +331,40 @@ class Stories extends API
             $cache_tag .= sha1(implode('_', $params));
 
             $stories = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($params) {
-                return mStories::where('company_id', '=', $params['company_id'])
-                    ->where('deleted_at', '=', null)
-                    ->when($params['only_published'], function ($query) {
-                        return $query->where('publish', '=', true);
-                    })
-                    ->orderBy($params['order_by'], $params['order'])
-                    ->offset($params['offset'])
-                    ->limit($params['limit'])
-                    ->get()
+                // return mStories::where('company_id', '=', $params['company_id'])
+                //     ->where('deleted_at', '=', null)
+                //     ->when($params['only_published'], function ($query) {
+                //         return $query->where('publish', '=', true);
+                //     })
+                //     ->orderBy($params['order_by'], $params['order'])
+                //     ->offset($params['offset'])
+                //     ->limit($params['limit'])
+                //     ->get()
+                $qry = new mStories();
+                return $qry->getStoriesByCompanyId(
+                    $params['company_id'],
+                    $params['offset'],
+                    $params['limit'],
+                    $params['order_by'],
+                    $params['order'],
+                    $params['only_published'],
+                    $params['attached_with'],
+                    $params['attached_order']
+                )
                     ->map(function ($story) use ($params) {
                         $data = new \stdClass();
 
                         $data->id = $story->id;
                         $data->title = $story->title;
                         $data->source = $story->getSource();
-                        $data->thumbnail = $story->getThumbnailOptimized($params['thumbnail_width'], $params['thumbnail_height'], $params['thumbnail_mode'], $params['thumbnail_keep_asp_ratio'], $params['thumbnail_quality'], $params['thumbnail_blur']);
+                        $data->thumbnail = $story->getThumbnailOptimized(
+                            $params['thumbnail_width'],
+                            $params['thumbnail_height'],
+                            $params['thumbnail_mode'],
+                            $params['thumbnail_keep_asp_ratio'],
+                            $params['thumbnail_quality'],
+                            $params['thumbnail_blur']
+                        );
                         $data->status = $story->status;
                         $data->publish = $story->publish;
                         $data->views = $story->views;
@@ -388,7 +408,7 @@ class Stories extends API
     public function getById(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
-            'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'story_id' => ['required', 'string', 'size:36', 'uuid'],
             'thumbnail_width' => ['nullable', 'integer', 'min:32', 'max:1920'],
             'thumbnail_height' => ['nullable', 'integer', 'min:32', 'max:1920'],

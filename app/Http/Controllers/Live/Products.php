@@ -45,6 +45,7 @@ class Products extends API
         $params['get_product'] = isset($params['get_product']) ? filter_var($params['get_product'], FILTER_VALIDATE_BOOLEAN) : false;
         $params['link'] = isset($params['link']) ? trim($params['link']) : null;
         $params['images_url'] = isset($params['images_url']) ? trim($params['images_url']) : null;
+        $params['images'] = isset($params['images']) ? trim($params['images']) : null;
 
         try {
             $data = [
@@ -66,7 +67,7 @@ class Products extends API
 
             $product = mLiveStreamProducts::create($data);
 
-            if (isset($params['images'])) {
+            if ($params['images'] !== null) {
                 $params['images'] = trim($params['images']);
                 $params['images'] = explode(';', $params['images']);
                 $params['images'] = array_map(function ($image) {
@@ -490,11 +491,19 @@ class Products extends API
             'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'offset' => ['nullable', 'integer', 'min:0'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'order_by' => ['nullable', 'string', 'in:id,created_at,deleted_at,price,views,clicks'],
+            'order_by' => ['nullable', 'string', 'in:id,title,price,created_at,deleted_at'],
             'order' => ['nullable', 'string', 'in:asc,desc'],
             'groups' => ['nullable', new strBoolean],
-            'story_attached' => ['nullable', 'string', 'size:36', 'uuid', 'exists:stories,id'],
-            'stream_attached' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestreams,id'],
+            'image_width' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'image_height' => ['nullable', 'integer', 'min:32', 'max:1920'],
+            'image_mode' => ['nullable', 'string', 'in:fit,resize,crop'],
+            'image_keep_asp_ratio' => ['nullable', new strBoolean],
+            'image_quality' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'image_blur' => ['nullable', new strBoolean],
+            'attached_story' => ['nullable', 'string', 'size:36', 'uuid', 'exists:stories,id'],
+            'attached_stream' => ['nullable', 'string', 'size:36', 'uuid', 'exists:livestreams,id'],
+            'attached_order' => ['nullable', 'string', 'in:asc,desc'],
+            'attached_only' => ['nullable', new strBoolean],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -505,25 +514,46 @@ class Products extends API
         try {
             $params['offset'] = isset($params['offset']) ? intval($params['offset']) : 0;
             $params['limit'] = isset($params['limit']) ? intval($params['limit']) : 80;
-            $params['order_by'] = isset($params['order_by']) ? $params['order_by'] : 'created_at';
-            $params['order'] = isset($params['order']) ? $params['order'] : 'asc';
+            $params['order_by'] = isset($params['order_by']) ? strtolower(trim($params['order_by'])) : 'created_at';
+            $params['order'] = isset($params['order']) ? strtolower(trim($params['order'])) : 'asc';
             $params['groups'] = isset($params['groups']) ? filter_var($params['groups'], FILTER_VALIDATE_BOOLEAN) : false;
-            $params['story_attached'] = isset($params['story_attached']) ? trim($params['story_attached']) : null;
-            $params['stream_attached'] = isset($params['stream_attached']) ? trim($params['stream_attached']) : null;
-            $has_token = isset($params['token']);
+            $params['image_width'] = isset($params['image_width']) ? intval($params['image_width']) : 128;
+            $params['image_height'] = isset($params['image_height']) ? intval($params['image_height']) : 128;
+            $params['image_mode'] = isset($params['image_mode']) ? $params['image_mode'] : 'fit';
+            $params['image_keep_asp_ratio'] = isset($params['image_keep_asp_ratio']) ? filter_var($params['image_keep_asp_ratio'], FILTER_VALIDATE_BOOLEAN) : true;
+            $params['image_quality'] = isset($params['image_quality']) ? intval($params['image_quality']) : 80;
+            $params['image_blur'] = isset($params['image_blur']) ? filter_var($params['image_blur'], FILTER_VALIDATE_BOOLEAN) : false;
+            $params['attached_story'] = isset($params['attached_story']) ? trim($params['attached_story']) : null;
+            $params['attached_stream'] = isset($params['attached_stream']) ? trim($params['attached_stream']) : null;
+            $params['attached_order'] = isset($params['attached_order']) ? strtolower(trim($params['attached_order'])) : null;
+            $params['attached_only'] = isset($params['attached_only']) ? filter_var($params['attached_only'], FILTER_VALIDATE_BOOLEAN) : false;
 
             $cache_tag = 'products_by_company_' . $company_id;
             $cache_tag .= sha1(implode('_', $params));
 
-            $products = match ($has_token) {
-                true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($company_id, $params) {
-                    return mLiveStreamProducts::where('company_id', '=', $company_id)
-                        ->where('deleted_at', '=', null)->offset($params['offset'])
-                        ->limit($params['limit'])
-                        ->orderBy($params['order_by'], $params['order'])
-                        ->get()
+            $products = match (isset($params['token'])) {
+                true => Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL_PRODUCTS), function () use ($params) {
+                    $qry = new mLiveStreamProducts();
+                    return $qry->getProductsByCompanyId(
+                        $params['company_id'],
+                        $params['offset'],
+                        $params['limit'],
+                        $params['order_by'],
+                        $params['order'],
+                        $params['attached_only'],
+                        $params['attached_order'],
+                        $params['attached_story'],
+                        $params['attached_stream'],
+                    )
                         ->map(function ($product) use ($params) {
-                            $product->images = $product->getImagesDetailsOptimized();
+                            $product->images = $product->getImagesDetailsOptimized(
+                                $params['image_width'],
+                                $params['image_height'],
+                                $params['image_mode'],
+                                $params['image_keep_asp_ratio'],
+                                $params['image_quality'],
+                                $params['image_blur']
+                            );
                             $product->link = $product->getLink();
 
                             if ($params['groups']) {
@@ -533,14 +563,8 @@ class Products extends API
                                 });
                             }
 
-                            $promoted = false;
-                            if ($params['story_attached'] !== null) {
-                                $product->attached = $product->isAttachedWithStory($params['story_attached'], $promoted);
-                            } else if ($params['stream_attached'] !== null) {
-                                $product->attached = $product->isAttachedWithStream($params['stream_attached'], $promoted);
-                            }
-
-                            $product->promoted = $promoted;
+                            $product->promoted = boolval($product->promoted ?? false);
+                            $product->attached = boolval($product->attached ?? false);
                             $product->created = $product->created_at;
                             return $product;
                         });
@@ -977,6 +1001,7 @@ class Products extends API
             ];
             if (config('app.debug')) {
                 $message->debug = $e->getMessage();
+                Log::error($e->getMessage());
             }
             $r->messages[] = $message;
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);

@@ -22,6 +22,8 @@ return new class extends Migration
             $table->uuid('story_id')->nullable()->default(null)->index();
             $table->foreign('story_id')->references('id')->on('stories')->onDelete('cascade');
             $table->boolean('promoted')->default(false);
+            $table->float('time_from', 8, 2, true)->nullable()->default(null);
+            $table->float('time_to', 8, 2, true)->nullable()->default(null);
             $table->timestamps();
         });
     }

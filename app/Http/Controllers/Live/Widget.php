@@ -32,17 +32,22 @@ class Widget extends API
 
         $dataset = [];
 
+        $div_id = '';
+
         if (isset($params['company_id'])) {
             $dataset['data-company-id'] = $params['company_id'];
         }
         if (isset($params['stream_id'])) {
             $dataset['data-stream-id'] = $params['stream_id'];
+            $div_id = 'stream-widget';
         }
         if (isset($params['swipe_id'])) {
             $dataset['data-swipe-id'] = $params['swipe_id'];
+            $div_id = 'stories-widget';
         }
         if (isset($params['story_id'])) {
             $dataset['data-story-id'] = $params['story_id'];
+            $div_id = 'stories-widget';
         }
 
         $dataset = implode(' ', array_map(
@@ -54,8 +59,8 @@ class Widget extends API
         ));
 
         $r->data = (object) [
-            'widget' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' async></script>'),
-            'embed' => preg_replace('/\s+/', ' ', '<div id="widget"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' data-force-embed="true" async></script>'),
+            'widget' => preg_replace('/\s+/', ' ', '<link rel="stylesheet" href="https://cdn.gobliver.com/widget/css/main.css"><div id="' . $div_id . '"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' async></script>'),
+            'embed' => preg_replace('/\s+/', ' ', '<link rel="stylesheet" href="https://cdn.gobliver.com/widget/css/main.css"><div id="' . $div_id . '"></div><script type="application/javascript" src="https://cdn.gobliver.com/widget/js/main.js" ' . $dataset . ' data-force-embed="true" async></script>'),
         ];
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);

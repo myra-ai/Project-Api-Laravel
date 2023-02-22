@@ -16,7 +16,7 @@ class Stories extends Authenticatable
     protected $primaryKey = 'id';
     public $timestamps = true;
     protected $dateFormat = 'Y-m-d H:i:s.u';
-    
+
     /**
      * The attributes that are mass assignable.
      *
@@ -34,6 +34,7 @@ class Stories extends Authenticatable
         'media_id',
         'publish',
         'shares',
+        'embed',
         'status',
         'title',
         'views',
@@ -65,6 +66,7 @@ class Stories extends Authenticatable
         'company_id' => 'string',
         'media_id' => 'string',
         'title' => 'string',
+        'embed' => 'boolean',
         'publish' => 'boolean',
         'status' => 'string',
         'comments' => 'integer',
@@ -96,6 +98,7 @@ class Stories extends Authenticatable
             'mime' => $source->mime ?? null,
             'width' => $source->width ?? null,
             'height' => $source->height ?? null,
+            'duration' => $source->duration !== null ? round($source->duration, 2) : null,
             'url' => $source->s3_available !== null ? API::getMediaCdnUrl($source->path) : API::getMediaUrl($source->id),
         ];
     }
@@ -136,7 +139,7 @@ class Stories extends Authenticatable
         }
 
         if (($optimized = API::mediaSized($thumbnail->id, $width, $height, $order_by, $order, $offset)) === null) {
-            MediaResizer::dispatch($thumbnail->id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur,'webp');
+            MediaResizer::dispatch($thumbnail->id, $width, $height, $mode, $keep_aspect_ratio, $quality, $blur, 'webp');
         } else {
             return (object) [
                 'id' => $optimized->id,
@@ -183,10 +186,36 @@ class Stories extends Authenticatable
         });
     }
 
-    public function isAttachWith(string $swipe_id)
+    public function isAttachWith(string $swipe_id): bool
     {
         return $this->hasOne(SwipeGroups::class, 'story_id', 'id')
             ->where('swipe_id', '=', $swipe_id)
             ->exists();
+    }
+
+    public function swipeGroups()
+    {
+        return $this->hasMany(SwipeGroups::class, 'story_id', 'id');
+    }
+
+    public function getStoriesByCompanyId(string $company_id, int $offset = 0, int $limit = 80, string $order_by = 'created_at', string $order = 'ASC', bool $only_published = false, ?string $attach_with = null, ?string $attach_order = null)
+    {
+        return $this->where('company_id', '=', $company_id)
+            ->where('deleted_at', '=', null)
+            ->when($only_published, function ($query) {
+                return $query->where('publish', '=', true);
+            })
+            ->when($attach_with !== null, function ($query) use ($attach_with, $attach_order) {
+                return $query->whereHas('swipeGroups', function ($query) use ($attach_with, $attach_order) {
+                    $query->where('swipe_id', '=', $attach_with)
+                        ->when($attach_order !== null, function ($query) use ($attach_order) {
+                            return $query->orderBy('created_at', $attach_order);
+                        });
+                });
+            })
+            ->orderBy($order_by, $order)
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
     }
 }

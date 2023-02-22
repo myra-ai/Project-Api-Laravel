@@ -26,6 +26,8 @@ class LiveStreamProductGroups extends Authenticatable
         'stream_id',
         'story_id',
         'promoted',
+        'time_from',
+        'time_to'
     ];
 
     protected $hidden = [
@@ -44,6 +46,8 @@ class LiveStreamProductGroups extends Authenticatable
         'stream_id' => 'string',
         'story_id' => 'string',
         'promoted' => 'boolean',
+        'time_from' => 'float',
+        'time_to' => 'float',
         'created_at' => 'timestamp',
         'updated_at' => 'timestamp',
     ];

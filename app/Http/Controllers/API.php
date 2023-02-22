@@ -615,11 +615,12 @@ class API extends Controller
         $params['thumbnail_blur'] = isset($params['thumbnail_blur']) ? filter_var($params['thumbnail_blur'], FILTER_VALIDATE_BOOLEAN) : false;
 
         return (object) [
-            'company_id' => $story->company_id,
+            'id' => $story->id,
             'title' => $story->title,
             'source' => $story->getSource(),
             'thumbnail' => $story->getThumbnailOptimized($params['thumbnail_width'], $params['thumbnail_height'], $params['thumbnail_mode'], $params['thumbnail_keep_asp_ratio'], $params['thumbnail_quality'], $params['thumbnail_blur']),
             'status' => $story->status,
+            'embed' => $story->embed,
             'publish' => $story->publish,
             'viewers' => $story->viewers,
             'clicks' => $story->clicks,
@@ -1949,6 +1950,7 @@ class API extends Controller
         $device = null;
         $os = null;
 
+        $metrics['media_id'] = isset($metrics['media_id']) ? trim($metrics['media_id']) : null;
         $metrics['load'] = isset($metrics['load']) ? $metrics['load'] : 0;
         $metrics['click'] = isset($metrics['click']) ? $metrics['click'] : 0;
         $metrics['like'] = isset($metrics['like']) ? $metrics['like'] : 0;
@@ -1960,16 +1962,18 @@ class API extends Controller
         $metrics['comment'] = isset($metrics['comment']) ? $metrics['comment'] : 0;
 
         try {
-            $db_city = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
-            $region = $db_city->city($ip);
-            $state = $region->mostSpecificSubdivision->isoCode ?? null;
+            $geoip2 = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
+            $geoip2 = $geoip2->city($ip);
+            $region = $geoip2->mostSpecificSubdivision->name ?? null;
+            $state = $geoip2->mostSpecificSubdivision->isoCode ?? null;
         } catch (\Exception $e) {
             // Ignore
         }
 
         try {
-            $db_country = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
-            $country = $db_country->country($ip);
+            $geoip2 = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
+            $geoip2 = $geoip2->country($ip);
+            $country = $geoip2->country->isoCode ?? null;
         } catch (\Exception $e) {
             // Ignore
         }
@@ -1987,6 +1991,7 @@ class API extends Controller
 
         $metric = [
             'stream_id' => $params['stream_id'],
+            'media_id' => $metrics['media_id'],
             'created_at' => now()->format('Y-m-d H:i:s.u'),
             'ip' => $request->ip(),
             'region' => $region,
@@ -2037,6 +2042,7 @@ class API extends Controller
         $device = null;
         $os = null;
 
+        $metrics['media_id'] = isset($metrics['media_id']) ? trim($metrics['media_id']) : null;
         $metrics['load'] = isset($metrics['load']) ? $metrics['load'] : 0;
         $metrics['click'] = isset($metrics['click']) ? $metrics['click'] : 0;
         $metrics['like'] = isset($metrics['like']) ? $metrics['like'] : 0;
@@ -2048,16 +2054,18 @@ class API extends Controller
         $metrics['comment'] = isset($metrics['comment']) ? $metrics['comment'] : 0;
 
         try {
-            $db_city = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
-            $region = $db_city->city($ip);
-            $state = $region->mostSpecificSubdivision->isoCode ?? null;
+            $geoip2 = new Reader('/usr/share/GeoIP2/GeoLite2-City.mmdb');
+            $geoip2 = $geoip2->city($ip);
+            $region = $geoip2->mostSpecificSubdivision->name ?? null;
+            $state = $geoip2->mostSpecificSubdivision->isoCode ?? null;
         } catch (\Exception $e) {
             // Ignore
         }
 
         try {
-            $db_country = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
-            $country = $db_country->country($ip);
+            $geoip2 = new Reader('/usr/share/GeoIP2/GeoLite2-Country.mmdb');
+            $geoip2 = $geoip2->country($ip);
+            $country = $geoip2->country->isoCode ?? null;
         } catch (\Exception $e) {
             // Ignore
         }
@@ -2075,6 +2083,7 @@ class API extends Controller
 
         $metric = [
             'story_id' => $params['story_id'],
+            'media_id' => $metrics['media_id'],
             'created_at' => now()->format('Y-m-d H:i:s.u'),
             'ip' => $request->ip(),
             'region' => $region,

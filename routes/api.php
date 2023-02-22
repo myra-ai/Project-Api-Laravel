@@ -1,10 +1,8 @@
 <?php
 
-use App\Events\Chat\SendMessage;
 use App\Http\Controllers as C;
 use App\Http\Controllers\Live as L;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -17,10 +15,6 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
-
-// Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-//     return $request->user();
-// });
 
 Route::post('/stream/{company_id}', [L\Streams::class, 'doCreate']);
 Route::put('/stream/{stream_id}', [L\Streams::class, 'doUpdate']);
@@ -44,12 +38,6 @@ Route::put('/swipe/{swipe_id}', [L\Swipes::class, 'doUpdate']);
 Route::delete('/swipe/{swipe_id}', [L\Swipes::class, 'doDelete']);
 Route::post('/swipe/{swipe_id}/story', [L\Swipes::class, 'doAttachStory']);
 Route::delete('/swipe/{swipe_id}/story', [L\Swipes::class, 'doDetachStory']);
-
-// Route::get('/stream/{live_id}/asset', [L\Streams::class, 'streamAsset']);
-// Route::get('/stream/assets', [L\Streams::class, 'streamAssets']);
-
-// Route::get('/stream/{live_id}/playback', [L\Streams::class, 'streamPlayback']);
-// Route::get('/stream/playbacks', [L\Streams::class, 'streamPlaybacks']);
 
 Route::get('/stream/status/{stream_id}', [L\Streams::class, 'getStatus']);
 Route::get('/stream/views/current/{stream_id}', [L\Streams::class, 'getCurrentViews']);

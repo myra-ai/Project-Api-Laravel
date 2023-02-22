@@ -286,30 +286,38 @@ class Swipes extends API
         if (($params = API::doValidate($r, [
             'swipe_id' => ['required', 'string', 'size:36', 'uuid'],
             'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
-            'show_attached' => ['nullable', new strBoolean],
+            'attached_show' => ['nullable', new strBoolean],
+            'attached_detailed' => ['nullable', new strBoolean],
         ], $request->all(), ['swipe_id' => $swipe_id])) instanceof JsonResponse) {
             return $params;
         }
+
+        $params['attached_show'] = isset($params['attached_show']) ? filter_var($params['attached_show'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['attached_detailed'] = isset($params['attached_detailed']) ? filter_var($params['attached_detailed'], FILTER_VALIDATE_BOOLEAN) : false;
+        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
 
         if (($swipe = API::getSwipe($params['swipe_id'], $r)) instanceof JsonResponse) {
             return $swipe;
         }
 
-        $params['token'] = isset($params['token']) ? trim($params['token']) : null;
-
         if ($params['token'] === null) {
-            $r->data = $swipe->makeHidden(['company_id', 'created_at', 'updated_at', 'deleted_at']);
+            $swipe->makeHidden(['id', 'company_id', 'created_at', 'updated_at', 'deleted_at']);
         } else {
-            $swipe->makeHidden(['company_id', 'updated_at', 'deleted_at']);
-            if ($params['show_attached']) {
+            $swipe->makeHidden(['id', 'company_id', 'updated_at', 'deleted_at']);
+        }
+
+        if ($params['attached_show']) {
+            if ($params['attached_detailed']) {
+                $swipe->stories = $swipe->getAttachedStoriesDetailed();
+            } else {
                 $swipe->stories = $swipe->getAttachedStories()->map(function ($story) {
                     $story->makeHidden(['swipe_id', 'created_at', 'updated_at']);
                     return $story;
                 });
             }
-            $r->data = $swipe;
         }
 
+        $r->data = $swipe;
         $r->success = true;
         return response()->json($r, Response::HTTP_OK);
     }

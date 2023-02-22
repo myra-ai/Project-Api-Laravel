@@ -68,8 +68,12 @@ class LiveStreamProducts extends Authenticatable
         'deleted_at' => 'timestamp',
     ];
 
-    public function getImages(string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
-    {
+    public function getImages(
+        string $order_by = 'updated_at',
+        string $order = 'asc',
+        int $offset = 0,
+        int $limit = 30
+    ) {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')->select('media_id')
             ->orderBy($order_by, $order)
             ->offset($offset)
@@ -88,8 +92,12 @@ class LiveStreamProducts extends Authenticatable
             });
     }
 
-    public function getImagesDetails(string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
-    {
+    public function getImagesDetails(
+        string $order_by = 'updated_at',
+        string $order = 'asc',
+        int $offset = 0,
+        int $limit = 30
+    ) {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
             ->orderBy($order_by, $order)
             ->offset($offset)
@@ -116,8 +124,18 @@ class LiveStreamProducts extends Authenticatable
             });
     }
 
-    public function getImagesDetailsOptimized(int $width = 256, int $height = 256, string $mode = 'resize', bool $keep_aspect_ratio = true, int $quality = 80, bool $blur = true, string $order_by = 'updated_at', string $order = 'asc', int $offset = 0, int $limit = 30)
-    {
+    public function getImagesDetailsOptimized(
+        int $width = 256,
+        int $height = 256,
+        string $mode = 'resize',
+        bool $keep_aspect_ratio = true,
+        int $quality = 80,
+        bool $blur = true,
+        string $order_by = 'updated_at',
+        string $order = 'asc',
+        int $offset = 0,
+        int $limit = 30
+    ) {
         return $this->hasMany(LiveStreamProductsImages::class, 'product_id', 'id')
             ->orderBy($order_by, $order)
             ->offset($offset)
@@ -209,14 +227,24 @@ class LiveStreamProducts extends Authenticatable
             ->select('products.*', 'product_groups.id as group_id');
     }
 
+    public function groups()
+    {
+        return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id');
+    }
+
     public function getGroups()
     {
-        return $this->hasMany(LiveStreamProductGroups::class, 'product_id', 'id')->get();
+        return $this->groups()->get();
+    }
+
+    public function group()
+    {
+        return $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id');
     }
 
     public function getGroup()
     {
-        return $this->hasOne(LiveStreamProductGroups::class, 'product_id', 'id')->first();
+        return $this->group()->first();
     }
 
     public function isAttachedWithStory(string $story_id, &$promoted = false): bool
@@ -237,5 +265,58 @@ class LiveStreamProducts extends Authenticatable
         }
         $promoted = $qry->promoted  ?? false;
         return true;
+    }
+
+    public function getProductsByCompanyId(
+        string $company_id,
+        int $offset = 0,
+        int $limit = 80,
+        string $order_by = 'created_at',
+        string $order = 'ASC',
+        bool $attached_only = false,
+        ?string $attached_order = null,
+        ?string $attached_story = null,
+        ?string $attached_stream = null
+    ) {
+        return $this->where('company_id', '=', $company_id)
+            ->where('deleted_at', '=', null)
+            ->when($attached_story !== null, function ($query) use ($attached_story, $attached_only, $attached_order) {
+                if ($attached_only) {
+                    $qry = $query->join('product_groups', 'product_groups.product_id', '=', 'products.id')
+                        ->where('product_groups.story_id', '=', $attached_story);
+                } else {
+                    $qry = $query->leftjoin('product_groups', function ($join) use ($attached_story) {
+                        $join->on('product_groups.product_id', '=', 'products.id')
+                            ->where('product_groups.story_id', '=', $attached_story);
+                    });
+                }
+                $qry->select('products.*', 'product_groups.promoted as promoted', self::raw('IF(product_groups.id IS NOT NULL, 1, 0) as attached'))
+                    ->when($attached_order !== null, function ($query) use ($attached_order) {
+                        return $query->orderBy('attached', $attached_order);
+                    });
+                return $qry;
+            })
+            ->when($attached_stream !== null, function ($query) use ($attached_stream, $attached_only, $attached_order) {
+                if ($attached_only) {
+                    $qry = $query->join('product_groups', 'product_groups.product_id', '=', 'products.id')
+                        ->where('product_groups.stream_id', '=', $attached_stream);
+                } else {
+                    $qry = $query->leftjoin('product_groups', function ($join) use ($attached_stream) {
+                        $join->on('product_groups.product_id', '=', 'products.id')
+                            ->where('product_groups.stream_id', '=', $attached_stream);
+                    });
+                }
+                $qry->select('products.*', 'product_groups.promoted as promoted', self::raw('IF(product_groups.id IS NOT NULL, 1, 0) as attached'))
+                    ->when($attached_order !== null, function ($query) use ($attached_order) {
+                        return $query->orderBy('attached', $attached_order);
+                    });
+                return $qry;
+            })
+            ->offset($offset)
+            ->limit($limit)
+            ->when($attached_order === null, function ($query) use ($order_by, $order) {
+                return $query->orderBy($order_by, $order);
+            })
+            ->get();
     }
 }

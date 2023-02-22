@@ -13,11 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('swipe_metrics', function (Blueprint $table) {
+        Schema::create('links_metrics', function (Blueprint $table) {
             $table->id();
-            $table->uuid('swipe_id')->index();
-            $table->foreign('swipe_id')->references('id')->on('swipes')->onDelete('cascade');
-            $table->json('medias_id')->index();
+            $table->uuid('link_id')->index();
+            $table->foreign('link_id')->references('id')->on('links')->onDelete('cascade');
             $table->timestamp('created_at', 6)->useCurrent()->index();
             $table->string('ip', 128)->nullable()->default(null)->index();
             $table->string('region', 80)->nullable()->default(null)->index();
@@ -29,10 +28,6 @@ return new class extends Migration
             $table->string('browser', 128)->nullable()->default(null)->index();
             $table->integer('load')->default(0)->index();
             $table->integer('click')->default(0)->index();
-            $table->integer('like')->default(0)->index();
-            $table->integer('unlike')->default(0)->index();
-            $table->integer('dislike')->default(0)->index();
-            $table->integer('undislike')->default(0)->index();
             $table->integer('view')->default(0)->index();
             $table->integer('share')->default(0)->index();
             $table->integer('comment')->default(0)->index();
@@ -46,6 +41,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('swipe_metrics');
+        Schema::dropIfExists('links_metrics');
     }
 };

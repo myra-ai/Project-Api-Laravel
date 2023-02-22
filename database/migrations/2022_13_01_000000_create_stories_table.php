@@ -20,6 +20,7 @@ return new class extends Migration
             $table->uuid('media_id')->nullable()->default(null)->index();
             $table->foreign('media_id')->references('id')->on('medias')->onDelete('cascade');
             $table->string('title', 255);
+            $table->boolean('embed')->default(false);
             $table->boolean('publish')->default(false);
             $table->string('status', 16)->default('DRAFT');
             $table->bigInteger('clicks')->unsigned()->default(0)->index();
