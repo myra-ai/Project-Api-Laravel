@@ -87,8 +87,6 @@ class MediaResizer implements ShouldQueue
             $constraint->upsize();
         });
 
-
-
         if ($image->save($resized_path, $quality, $format)) {
             $checksum = API::getMediaChecksum($resized_path, $media->type);
             $resized_id = Str::uuid()->toString();

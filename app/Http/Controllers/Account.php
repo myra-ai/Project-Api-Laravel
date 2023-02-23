@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\ResetPassword;
 use App\Models\LiveStreamCompanies as mLiveStreamCompanies;
 use App\Models\LiveStreamCompanyUsers as mLiveStreamCompanyUsers;
 use App\Models\PasswordResets as mPasswordResets;
@@ -12,8 +11,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use App\Jobs\SendMailResetPassword;
 
 class Account extends API
 {
@@ -333,16 +332,35 @@ class Account extends API
             return $company_user;
         }
 
+        try {
+            $company_user->last_login = now()->format('Y-m-d H:i:s.u');
+            $company_user->last_login_ip = $request->ip();
+            $company_user->save();
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to update user last login.'),
+            ];
+            if (config('app.env') === 'local') {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
         $r->success = true;
         $r->data = (object) [
             'id' => $company->id,
-            'avatar' => $company->getAvatar(),
+            'avatar' => $company_user->getAvatar(),
             'created_at' => $company_user->created_at,
             'email' => $company_user->email,
-            'logo' => $company->getLogo(),
-            'brand_name' => $company->name,
             'name' => $company_user->name,
             'role' => $company_user->role,
+            'brand' => (object) [
+                'avatar' => $company->getAvatar(),
+                'logo' => $company->getLogo(),
+                'name' => $company->name,
+            ],
         ];
         return response()->json($r, Response::HTTP_OK);
     }
@@ -391,20 +409,7 @@ class Account extends API
             return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
-        try {
-            Mail::to($company_user->email)->send(new ResetPassword($company_user, $token));
-        } catch (\Exception $e) {
-            $message = (object) [
-                'type' => 'error',
-                'message' => __('Failed to send email.'),
-            ];
-            if (config('app.debug')) {
-                $message->debug = $e->getMessage();
-            }
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
+        SendMailResetPassword::dispatch($company_user, $token);
         return response()->json($r, Response::HTTP_OK);
     }
 
@@ -725,6 +730,7 @@ class Account extends API
             'password' => ['nullable', 'string', 'min:4', 'max:255'],
             'password_confirmation' => ['nullable', 'string', 'min:4', 'max:255', 'same:password'],
             'role' => ['nullable', 'integer', 'min:0', 'max:9'],
+            'avatar' => ['nullable', 'string', 'uuid', 'size:36'],
         ], $request->all(), ['user_id' => $user_id])) instanceof JsonResponse) {
             return $params;
         }
@@ -757,6 +763,43 @@ class Account extends API
         $params['zip'] = $params['zip'] ?? null;
         $params['password'] = $params['password'] ?? null;
         $params['role'] = intval($params['role']) ?? null;
+        $params['avatar'] = $params['avatar'] ?? null;
+
+        if (
+            ($params['name'] !== null && $params['name'] === $company_user->name) &&
+            ($params['email'] !== null && $params['email'] === $company_user->email) &&
+            ($params['role'] !== null && $params['role'] === $company_user->role) &&
+            ($params['phone'] !== null && $params['phone'] === $company_user->phone) &&
+            ($params['phone_country'] !== null && $params['phone_country'] === $company_user->phone_country) &&
+            ($params['phone_country_dial'] !== null && $params['phone_country_dial'] === $company_user->phone_country_dial) &&
+            ($params['country'] !== null && $params['country'] === $company_user->country) &&
+            ($params['state'] !== null && $params['state'] === $company_user->state) &&
+            ($params['city'] !== null && $params['city'] === $company_user->city) &&
+            ($params['address'] !== null && $params['address'] === $company_user->address) &&
+            ($params['zip'] !== null && $params['zip'] === $company_user->zip) &&
+            ($params['password'] !== null && Hash::check($params['password'], $company_user->password)) &&
+            ($params['avatar'] !== null && $params['avatar'] === $company_user->avatar) ||
+            ($params['name'] === null &&
+                $params['email'] === null &&
+                $params['role'] === null &&
+                $params['phone'] === null &&
+                $params['phone_country'] === null &&
+                $params['phone_country_dial'] === null &&
+                $params['country'] === null &&
+                $params['state'] === null &&
+                $params['city'] === null &&
+                $params['address'] === null &&
+                $params['zip'] === null &&
+                $params['password'] === null &&
+                $params['avatar'] === null
+            )
+        ) {
+            $r->messages[] = (object) [
+                'type' => 'warning',
+                'message' => __('Nothing to update.'),
+            ];
+            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        }
 
         if ($params['email'] !== null && $params['email'] !== $company_user->email) {
             if (($company_user = API::getCompanyUserByEmail($params['email'], true, $r)) instanceof JsonResponse) {
@@ -782,38 +825,20 @@ class Account extends API
             }
         }
 
-        if (
-            ($params['name'] !== null && $params['name'] === $company_user->name) &&
-            ($params['email'] !== null && $params['email'] === $company_user->email) &&
-            ($params['role'] !== null && $params['role'] === $company_user->role) &&
-            ($params['phone'] !== null && $params['phone'] === $company_user->phone) &&
-            ($params['phone_country'] !== null && $params['phone_country'] === $company_user->phone_country) &&
-            ($params['phone_country_dial'] !== null && $params['phone_country_dial'] === $company_user->phone_country_dial) &&
-            ($params['country'] !== null && $params['country'] === $company_user->country) &&
-            ($params['state'] !== null && $params['state'] === $company_user->state) &&
-            ($params['city'] !== null && $params['city'] === $company_user->city) &&
-            ($params['address'] !== null && $params['address'] === $company_user->address) &&
-            ($params['zip'] !== null && $params['zip'] === $company_user->zip) &&
-            ($params['password'] !== null && Hash::check($params['password'], $company_user->password)) ||
-            ($params['name'] === null &&
-                $params['email'] === null &&
-                $params['role'] === null &&
-                $params['phone'] === null &&
-                $params['phone_country'] === null &&
-                $params['phone_country_dial'] === null &&
-                $params['country'] === null &&
-                $params['state'] === null &&
-                $params['city'] === null &&
-                $params['address'] === null &&
-                $params['zip'] === null &&
-                $params['password'] === null
-            )
-        ) {
-            $r->messages[] = (object) [
-                'type' => 'warning',
-                'message' => __('Nothing to update.'),
-            ];
-            return response()->json($r, Response::HTTP_UNAUTHORIZED);
+        if ($params['avatar'] !== null && $params['avatar'] !== $company_user->avatar) {
+            if (($avatar = API::getMedia($params['avatar'], $r)) instanceof JsonResponse) {
+                return $avatar;
+            }
+
+            if ($avatar === null) {
+                $r->messages[] = (object) [
+                    'type' => 'error',
+                    'message' => __('Avatar does not exist.'),
+                ];
+                return response()->json($r, Response::HTTP_UNAUTHORIZED);
+            }
+        } else {
+            $params['avatar'] = $company_user->avatar;
         }
 
         try {
@@ -864,6 +889,8 @@ class Account extends API
             if ($params['password'] !== null && !Hash::check($params['password'], $company_user->password)) {
                 $company_user->password = Hash::make($params['password']);
             }
+
+            $company_user->avatar = $params['avatar'];
 
             $company_user->save();
         } catch (\Exception $e) {

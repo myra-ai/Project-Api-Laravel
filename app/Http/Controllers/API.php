@@ -451,6 +451,9 @@ class API extends Controller
         }
 
         $params = $validator->validated();
+        $params = array_map(function ($value) {
+            return is_string($value) ? trim($value) : $value;
+        }, $params);
 
         if (isset($params['audio_only']) && $params['audio_only'] !== null) {
             $params['audio_only'] = filter_var($params['audio_only'], FILTER_VALIDATE_BOOLEAN);
