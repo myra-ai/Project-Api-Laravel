@@ -2,6 +2,7 @@
 
 use App\Http\Controllers as C;
 use App\Http\Controllers\Live as L;
+use App\Http\Middleware\CORS;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 | is assigned the "api" middleware group. Enjoy building your API!
 |
 */
+
 
 Route::post('/stream/{company_id}', [L\Streams::class, 'doCreate']);
 Route::put('/stream/{stream_id}', [L\Streams::class, 'doUpdate']);
@@ -109,9 +111,12 @@ Route::get('/metrics/top/streams', [L\Metrics::class, 'getTopStreams']);
 Route::get('/metrics/top/stories', [L\Metrics::class, 'getTopStories']);
 Route::get('/metrics/story/{story_id}', [L\Metrics::class, 'getStoryMetric']);
 
+Route::get('/language/translations/{language}', [C\Languages::class, 'getTranslations'])->name('language.translations');
+// Route::get('/language/translations/{language}/download', [C\Languages::class, 'downloadTranslations'])->withoutMiddleware([CORS::class])->name('language.download');
+Route::get('/language/availables', [C\Languages::class, 'getAvailableLanguages'])->name('language.availables');
+
 Route::get('/healthcheck', function () {
     return response()->json([
-        'code' => 200,
-        'requested_at' => now(),
+        'health' => 'OK',
     ], Response::HTTP_OK);
-});
+})->name('healthcheck')->withoutMiddleware(['throttle:api']);

@@ -44,6 +44,18 @@ return [
             'throw' => false,
         ],
 
+        'resources' => [
+            'driver' => 'local',
+            'root' => resource_path(),
+            'throw' => false,
+        ],
+
+        'languages' => [
+            'driver' => 'local',
+            'root' => resource_path('lang'),
+            'throw' => false,
+        ],
+
         'dashboard_assets' => [
             'driver' => 'local',
             'root' => '/home/kleberholtz/web/public_html/bliver-app/public/assets',

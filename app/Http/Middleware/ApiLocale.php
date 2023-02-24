@@ -5,7 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 
-class CORS
+class ApiLocale
 {
     /**
      * Handle an incoming request.
@@ -16,9 +16,13 @@ class CORS
      */
     public function handle(Request $request, Closure $next)
     {
-        return $next($request)
-            ->header('Access-Control-Allow-Origin', "*")
-            ->header('Access-Control-Allow-Methods', "HEAD, OPTIONS, GET, POST, PUT, DELETE")
-            ->header('Access-Control-Allow-Headers', "Accept, Authorization, Content-Type, Language, X-Requested-With");
+        if ($request->hasHeader('Language')) {
+            $locale = $request->header('Language');
+            if (in_array($locale, ['en', 'pt-BR'])) {
+                app()->setLocale($locale);
+            }
+        }
+
+        return $next($request);
     }
 }
