@@ -514,7 +514,7 @@ class API extends Controller
                 'message' => __('The story could not be found.'),
             ];
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $story;
@@ -558,7 +558,7 @@ class API extends Controller
                 'message' => __('The swipe could not be found.'),
             ];
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $swipe;
@@ -677,7 +677,7 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('Stream could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $stream;
@@ -724,7 +724,7 @@ class API extends Controller
                 $message->debug = $e->getMessage();
             }
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
         }
 
         if ($svc_stream === null) {
@@ -736,7 +736,7 @@ class API extends Controller
                 $message->debug = __('The stream service (environment variables) could not be found.');
             }
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         try {
@@ -1360,7 +1360,7 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('Product could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         if ($product->deleted_at !== null) {
@@ -1369,7 +1369,7 @@ class API extends Controller
                 'message' => __('The product is excluded.'),
             ];
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $product;
@@ -1410,7 +1410,7 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('Product group could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $group;
@@ -1451,7 +1451,7 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('Product image could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $image;
@@ -1524,16 +1524,15 @@ class API extends Controller
                 $message->debug = 'The media could not be found in the database.';
             }
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         if ($media->deleted_at !== null) {
-            $message = (object) [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('The media is excluded.'),
             ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $media;
@@ -1570,16 +1569,15 @@ class API extends Controller
                 $message->debug = 'The media could not be found in the database.';
             }
             $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         if ($media->deleted_at !== null) {
-            $message = (object) [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('The media is excluded.'),
             ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $media;
@@ -1647,16 +1645,15 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('User could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         if ($skip_check_account && $company_user->deleted_at !== null) {
-            $message = (object) [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('The user is excluded.'),
             ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $company_user;
@@ -1691,16 +1688,15 @@ class API extends Controller
                 'type' => 'error',
                 'message' => __('User could not be found.'),
             ];
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         if ($skip_check_account && $company_user->deleted_at !== null) {
-            $message = (object) [
+            $r->messages[] = (object) [
                 'type' => 'error',
                 'message' => __('The user is excluded.'),
             ];
-            $r->messages[] = $message;
-            return response()->json($r, Response::HTTP_BAD_REQUEST);
+            return response()->json($r, Response::HTTP_NOT_FOUND);
         }
 
         return $company_user;

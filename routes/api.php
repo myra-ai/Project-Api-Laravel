@@ -29,6 +29,7 @@ Route::get('/stream/rtmp/{stream_id}', [L\Streams::class, 'getRTMP']);
 
 Route::post('/story/{company_id}', [L\Stories::class, 'doCreate']);
 Route::get('/stories/{company_id}', [L\Stories::class, 'getListCompanyId']);
+Route::get('/stories/{company_id}/count', [L\Stories::class, 'getTotalCountByCompanyId']);
 Route::get('/story/{story_id}', [L\Stories::class, 'getById']);
 Route::put('/story/{story_id}', [L\Stories::class, 'doUpdate']);
 Route::delete('/story/{story_id}', [L\Stories::class, 'doDelete']);

@@ -405,6 +405,42 @@ class Stories extends API
         return response()->json($r, Response::HTTP_OK);
     }
 
+    public function getTotalCountByCompanyId(Request $request, ?string $company_id = null): JsonResponse
+    {
+        if (($params = API::doValidate($r, [
+            'token' => ['nullable', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
+            'company_id' => ['required', 'string', 'size:36', 'uuid'],
+        ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
+            return $params;
+        }
+
+        $stories_count = 0;
+
+        try {
+            $cache_tag = 'stories_' . $params['company_id'] . '_count';
+
+            $stories_count = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($params) {
+                return mStories::where('company_id', '=', $params['company_id'])->count();
+            });
+        } catch (\Exception $e) {
+            $message = (object) [
+                'type' => 'error',
+                'message' => __('Failed to get story count.'),
+            ];
+            if (env('APP_DEBUG', false)) {
+                $message->debug = $e->getMessage();
+            }
+            $r->messages[] = $message;
+            return response()->json($r, Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        $r->data = (object) [
+            'count' => $stories_count,
+        ];
+        $r->success = true;
+        return response()->json($r, Response::HTTP_OK);
+    }
+
     public function getById(Request $request, ?string $story_id = null): JsonResponse
     {
         if (($params = API::doValidate($r, [
