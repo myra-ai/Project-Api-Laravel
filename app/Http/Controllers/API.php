@@ -59,9 +59,10 @@ class API extends Controller
     const CACHE_TTL_SWIPES = 3;
 
     const STORY_STATUS_DRAFT = 0;
-    const STORY_STATUS_ACTIVE = 1;
-    const STORY_STATUS_ARCHIVE = 2;
-    const STORY_STATUS_DELETED = 3;
+    const STORY_STATUS_READY = 1;
+    const STORY_STATUS_ACTIVE = 2;
+    const STORY_STATUS_ARCHIVED = 3;
+    const STORY_STATUS_DELETED = 4;
 
     const STORY_NOT_PUBLISHED = 0;
     const STORY_PUBLISHED = 1;
@@ -492,8 +493,10 @@ class API extends Controller
 
         $story = null;
 
+        $cache_tag = 'story_by_id_' . $story_id;
+
         try {
-            $story = Cache::remember('story_by_id_' . $story_id, now()->addSeconds(API::CACHE_TTL), function () use ($story_id) {
+            $story = Cache::remember($cache_tag, now()->addSeconds(API::CACHE_TTL), function () use ($story_id) {
                 return mStories::where('id', '=', $story_id)->where('deleted_at', '=', null)->first();
             });
         } catch (\Exception $e) {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,7 +23,7 @@ return new class extends Migration
             $table->string('title', 255);
             $table->boolean('embed')->default(false);
             $table->boolean('publish')->default(false);
-            $table->string('status', 16)->default('DRAFT');
+            $table->smallInteger('status')->default(API::STORY_STATUS_DRAFT);
             $table->bigInteger('clicks')->unsigned()->default(0)->index();
             $table->bigInteger('comments')->unsigned()->default(0)->index();
             $table->bigInteger('dislikes')->unsigned()->default(0)->index();

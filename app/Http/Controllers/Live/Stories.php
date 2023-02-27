@@ -50,6 +50,7 @@ class Stories extends API
                 'company_id' => $params['company_id'],
                 'title' => $params['title'],
                 'media_id' => $params['media_id'],
+                'status' => API::STORY_STATUS_DRAFT,
             ];
 
             if ($params['media_id'] !== null) {
@@ -61,7 +62,7 @@ class Stories extends API
                     $r->messages[] = $message;
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
-                $data['status'] = 'ACTIVE';
+                $data['status'] = API::STORY_STATUS_READY;
             }
 
             mStories::create($data);
@@ -139,11 +140,12 @@ class Stories extends API
     {
         if (($params = API::doValidate($r, [
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
-            'story_id' => ['required', 'string', 'size:36', 'uuid'],
+            'story_id' => ['required', 'string', 'uuid', 'size:36'],
             'title' => ['nullable', 'string', 'min:4', 'max:100'],
-            'media_id' => ['nullable', 'string', 'size:36', 'uuid', 'exists:medias,id'],
-            'status' => ['nullable', 'string', 'in:draft,active,deleted'],
+            'media_id' => ['present', 'string', 'nullable'],
+            'status' => ['nullable', 'regex:/^[a-z0-9\s]+$/i', 'in:0,draft,1,active,2,archived,3,deleted'],
             'publish' => ['nullable', new strBoolean],
+            'embed' => ['nullable', new StrBoolean],
             'get_story' => ['nullable', new StrBoolean],
         ], $request->all(), ['story_id' => $story_id])) instanceof JsonResponse) {
             return $params;
@@ -153,10 +155,33 @@ class Stories extends API
             return $story;
         }
 
-        $params['title'] = isset($params['title']) ? trim($params['title']) : null;
-        $params['media_id'] = isset($params['media_id']) ? trim($params['media_id']) : null;
-        $params['status'] = isset($params['status']) ? trim(strtoupper($params['status'])) : null;
+        if ($params['media_id'] !== null) {
+            if (!mLiveStreamMedias::where('id', '=', $params['media_id'])->exists()) {
+                $message = (object) [
+                    'type' => 'warning',
+                    'message' => __('Invalid media ID.'),
+                ];
+                if (config('app.debug')) {
+                    $message->debug = (object) [
+                        'message' => __('Media ID does not exist.'),
+                    ];
+                }
+                $r->messages[] = $message;
+                return response()->json($r, Response::HTTP_BAD_REQUEST);
+            }
+        }
+
+        $params['title'] = isset($params['title']) ? $params['title'] : null;
+        $params['status'] = isset($params['status']) ? match (strtolower($params['status'])) {
+            '0', 'draft' => API::STORY_STATUS_DRAFT,
+            '1', 'ready' => API::STORY_STATUS_READY,
+            '2', 'active' => API::STORY_STATUS_ACTIVE,
+            '3', 'archived' => API::STORY_STATUS_ARCHIVED,
+            default => API::STORY_STATUS_DRAFT,
+        }
+            : null;
         $params['publish'] = isset($params['publish']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
+        $params['embed'] = isset($params['embed']) ? filter_var($params['embed'], FILTER_VALIDATE_BOOLEAN) : null;
         $params['get_story'] = isset($params['get_story']) ? filter_var($params['get_story'], FILTER_VALIDATE_BOOLEAN) : false;
 
         try {
@@ -164,55 +189,79 @@ class Stories extends API
                 $story->title = $params['title'];
             }
 
-            if ($params['media_id'] !== null) {
+            if ($params['embed'] !== null) {
+                $story->embed = $params['embed'];
+            }
+
+            if ($params['media_id'] !== $story->media_id) {
                 $story->media_id = $params['media_id'];
-                if ($story->status !== 'ACTIVE') {
-                    $story->status = 'ACTIVE';
+                if ($params['media_id'] !== null && $story->status !== API::STORY_STATUS_READY) {
+                    $story->status = API::STORY_STATUS_READY;
+                    $params['status'] = API::STORY_STATUS_READY;
                 }
             }
 
             if ($params['status'] !== null) {
-                if ($params['status'] === 'ACTIVE') {
-                    if ($story->media_id && $params['media_id'] === null) {
-                        $r->messages[] = (object) [
-                            'type' => 'error',
-                            'message' => __('Story must have a media to be active.'),
-                        ];
-                        return response()->json($r, Response::HTTP_BAD_REQUEST);
-                    }
+                if ($story->media_id === null && $params['status'] === API::STORY_STATUS_READY) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Story must have a media to be ready.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
 
-                if ($params['status'] === 'DELETED') {
-                    if ($story->publish === true) {
-                        $r->messages[] = (object) [
-                            'type' => 'error',
-                            'message' => __('Story must be unpublished to be deleted.'),
-                        ];
-                        return response()->json($r, Response::HTTP_BAD_REQUEST);
-                    }
+                if ($story->media_id === null && $params['status'] === API::STORY_STATUS_ACTIVE) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Story must have a media to be active.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
+                }
+
+                if ($story->publish && $params['status'] === API::STORY_STATUS_DELETED) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Story cannot be deleted while published.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
+                }
+
+                if ($story->publish && $params['status'] === API::STORY_STATUS_ARCHIVED) {
+                    $r->messages[] = (object) [
+                        'type' => 'error',
+                        'message' => __('Story cannot be archived while published.'),
+                    ];
+                    return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
 
                 $story->status = $params['status'];
             }
 
             if ($params['publish'] !== null) {
-                if (
-                    ($params['publish'] === true && $story->status !== 'ACTIVE') ||
-                    ($params['status'] !== null && ($params['publish'] === true && $params['status'] !== 'ACTIVE'))
-                ) {
-                    $r->messages[] = (object) [
+                if ($params['publish'] && $story->status !== API::STORY_STATUS_ACTIVE) {
+                    $message = (object) [
                         'type' => 'error',
                         'message' => __('Story must be active to be published.'),
-                        'debug' => [
-                            'status' => $story->status,
-                            'publish' => $params['publish'],
-                        ],
                     ];
+                    if (config('app.debug')) {
+                        $message->debug = (object) [
+                            'publish' => $params['publish'],
+                            'cur_state' => $story->publish,
+                            'status' => $params['status'],
+                            'cur_status' => $story->status,
+                        ];
+                    }
+                    $r->messages[] = (object) $message;
                     return response()->json($r, Response::HTTP_BAD_REQUEST);
                 }
 
                 $story->publish = $params['publish'];
             }
+
+            $cache_tag = 'story_by_id_' . $story->id;
+            Cache::forget($cache_tag);
+            Cache::put($cache_tag, $story, now()->addSeconds(API::CACHE_TTL));
+
             $story->save();
         } catch (\Exception $e) {
             $message = (object) [
@@ -264,6 +313,7 @@ class Stories extends API
 
         try {
             $story->deleted_at = $now;
+            $story->status = API::STORY_STATUS_DELETED;
             $story->save();
         } catch (\Exception $e) {
             $message = (object) [

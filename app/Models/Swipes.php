@@ -122,6 +122,7 @@ class Swipes extends Authenticatable
             ->where('deleted_at', '=', null)
             ->update([
                 'deleted_at' => now()->format('Y-m-d H:i:s.u'),
+                'status' => API::SWIPE_STATUS_DELETED,
             ]);
     }
 

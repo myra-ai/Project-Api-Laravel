@@ -100,7 +100,7 @@ class DatabaseSeeder extends Seeder
             'company_id' => $company_id,
             'title' => 'My First Story #1',
             'publish' => true,
-            'status' => 'ACTIVE',
+            'status' => API::STORY_STATUS_ACTIVE,
             'media_id' => $media_story->id,
         ]);
 
@@ -111,7 +111,7 @@ class DatabaseSeeder extends Seeder
             'company_id' => $company_id,
             'title' => 'My Second Story #2',
             'publish' => true,
-            'status' => 'ACTIVE',
+            'status' => API::STORY_STATUS_ACTIVE,
             'media_id' => $media_story->id,
         ]);
 
@@ -122,7 +122,7 @@ class DatabaseSeeder extends Seeder
             'company_id' => $company_id,
             'title' => 'My Third Story #3',
             'publish' => true,
-            'status' => 'ACTIVE',
+            'status' => API::STORY_STATUS_ACTIVE,
             'media_id' => $media_story->id,
         ]);
 

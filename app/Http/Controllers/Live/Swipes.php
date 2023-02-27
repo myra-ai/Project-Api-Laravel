@@ -19,23 +19,23 @@ class Swipes extends API
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'company_id' => ['required', 'string', 'size:36', 'uuid', 'exists:companies,id'],
             'title' => ['required', 'string', 'min:4', 'max:60'],
-            'status' => ['nullable', 'in:0,draft,1,ready,2,active,3,archived'],
+            'status' => ['nullable', 'regex:/^[a-z0-9\s]+$/i', 'in:0,draft,1,ready,2,active,3,archived'],
             'published' => ['nullable', new strBoolean],
             'stories' => ['nullable', 'string'],
         ], $request->all(), ['company_id' => $company_id])) instanceof JsonResponse) {
             return $params;
         }
 
-        $params['title'] = isset($params['title']) ? trim($params['title']) : null;
-        $params['status'] = isset($params['status']) ? match (strtolower(trim($params['status']))) {
+        $params['title'] = isset($params['title']) ? $params['title'] : null;
+        $params['status'] = isset($params['status']) ? match (strtolower($params['status'])) {
             '0', 'draft' => API::SWIPE_STATUS_DRAFT,
             '1', 'ready' => API::SWIPE_STATUS_READY,
             '2', 'active' => API::SWIPE_STATUS_ACTIVE,
             '3', 'archived' => API::SWIPE_STATUS_ARCHIVED,
             default => API::SWIPE_STATUS_DRAFT,
         }
-            : API::SWIPE_STATUS_DRAFT;
-        $params['stories'] = isset($params['stories']) ? trim($params['stories']) : null;
+        : API::SWIPE_STATUS_DRAFT;
+        $params['stories'] = isset($params['stories']) ? $params['stories'] : null;
         $params['published'] = isset($params['published']) ? filter_var($params['published'], FILTER_VALIDATE_BOOLEAN) : false;
 
         if ($params['stories'] !== null) {

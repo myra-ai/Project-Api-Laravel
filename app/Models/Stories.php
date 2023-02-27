@@ -68,7 +68,7 @@ class Stories extends Authenticatable
         'title' => 'string',
         'embed' => 'boolean',
         'publish' => 'boolean',
-        'status' => 'string',
+        'status' => 'integer',
         'comments' => 'integer',
         'clicks' => 'integer',
         'comments' => 'integer',
