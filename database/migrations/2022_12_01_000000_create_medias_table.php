@@ -3,8 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Artisan;
 
 return new class extends Migration
 {
@@ -15,25 +14,7 @@ return new class extends Migration
      */
     public function up()
     {
-        if (Storage::directoryMissing('public/images')) {
-            Storage::makeDirectory('public/images');
-            Log::info('Created directory: public/images');
-        }
-
-        if (Storage::directoryMissing('public/images/thumbnails')) {
-            Storage::makeDirectory('public/images/thumbnails');
-            Log::info('Created directory: public/images/thumbnails');
-        }
-
-        if (Storage::directoryMissing('public/videos')) {
-            Storage::makeDirectory('public/videos');
-            Log::info('Created directory: public/videos');
-        }
-
-        if (Storage::directoryMissing('public/unknown')) {
-            Storage::makeDirectory('public/unknown');
-            Log::info('Created directory: public/unknown');
-        }
+        Artisan::call('command:media_storage');
 
         Schema::create('medias', function (Blueprint $table) {
             $table->uuid('id')->primary();
