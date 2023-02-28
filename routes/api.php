@@ -37,6 +37,7 @@ Route::delete('/story/{story_id}', [L\Stories::class, 'doDelete']);
 Route::post('/swipe/{company_id}', [L\Swipes::class, 'doCreate']);
 Route::get('/swipes/{company_id}', [L\Swipes::class, 'getListByCompanyId']);
 Route::get('/swipe/{swipe_id}', [L\Swipes::class, 'getById']);
+Route::get('/swipe/{swipe_id}/stories', [L\Swipes::class, 'getStoriesBySwipeId']);
 Route::put('/swipe/{swipe_id}', [L\Swipes::class, 'doUpdate']);
 Route::delete('/swipe/{swipe_id}', [L\Swipes::class, 'doDelete']);
 Route::post('/swipe/{swipe_id}/story', [L\Swipes::class, 'doAttachStory']);

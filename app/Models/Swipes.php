@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 class Swipes extends Authenticatable
 {
@@ -70,7 +71,7 @@ class Swipes extends Authenticatable
             ->first();
     }
 
-    public function createSwipe(array $params, ?string &$id = null): Swipes
+    public function createSwipe(array $params, ?string &$id = null): ?Swipes
     {
         $id = Str::uuid()->toString();
         return $this->create([
@@ -79,7 +80,7 @@ class Swipes extends Authenticatable
             'title' => $params['title'],
             'status' => $params['status'],
             'published' => $params['published'],
-        ])->fresh();
+        ]);
     }
 
     public function updateSwipe(array $params, ?string &$message = null): ?bool
@@ -176,23 +177,108 @@ class Swipes extends Authenticatable
         return false;
     }
 
-    public function getAttachedStories(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 30): Collection
+    public function getAttachedStories(int $offset = 0, int $limit = 5, ?string $search = null, string $order_by = 'created_at', string $order = 'asc'): Collection
     {
-        return SwipeGroups::where('swipe_id', '=', $this->id)
+        return $this->belongsToMany(Stories::class, 'swipe_groups', 'swipe_id', 'story_id')
+            ->when($search, function ($qry, $search) {
+                return $qry->where('title', 'LIKE', "%{$search}%");
+            })
             ->orderBy($order_by, $order)
             ->offset($offset)
             ->limit($limit)
             ->get();
     }
 
-    public function getAttachedStoriesDetailed(string $order_by = 'created_at', string $order = 'asc', int $offset = 0, int $limit = 30): object
+    public function getAttachedStoriesDetailed(int $offset = 0, int $limit = 5, ?string $search = null, string $order_by = 'created_at', string $order = 'asc'): object
     {
-        return SwipeGroups::where('swipe_id', '=', $this->id)
+        return $this->belongsToMany(Stories::class, 'swipe_groups', 'swipe_id', 'story_id')
+            ->when($search, function ($qry, $search) {
+                return $qry->where('title', 'LIKE', "%{$search}%");
+            })
             ->orderBy($order_by, $order)
             ->offset($offset)
             ->limit($limit)
-            ->get()->map(function ($item) {
-                return API::story($item->getStory());
+            ->get()
+            ->map(function ($item) {
+                return API::story($item);
             });
+    }
+
+    public function isAttachStory(string $story_id): bool
+    {
+        return SwipeGroups::where('swipe_id', '=', $this->id)
+            ->where('story_id', '=', $story_id)
+            ->exists();
+    }
+
+    public function getStories(array $params = [], &$data_info)
+    {
+        $params = [
+            'offset' => $params['offset'] ?? 0,
+            'limit' => $params['limit'] ?? 5,
+            'filter' => $params['filter'] ?? 'all', // all,attached,unattached,status,published
+            'filter_status' => $params['filter_status'] ?? null,
+            'filter_publish' => $params['filter_publish'] ?? null,
+            'filter_from' => $params['filter_from'] ?? null,
+            'filter_to' => $params['filter_to'] ?? null,
+            'order_by' => $params['order_by'] ?? 'created_at', // created_at,updated_at
+            'order' => $params['order'] ?? 'asc',
+            'is_attached' => $params['is_attached'] ?? false,
+            'search' => $params['search'] ?? null,
+        ];
+
+        $qry = Stories::where('company_id', '=', $this->company_id)->where('deleted_at', '=', null);
+
+        if ($params['filter'] === 'all') {
+            $qry = $qry->where('id', '!=', null);
+        } elseif ($params['filter'] === 'attached') {
+            $qry = $qry->whereHas('swipeGroups', function ($qry) {
+                $qry->where('swipe_id', '=', $this->id);
+            });
+        } elseif ($params['filter'] === 'unattached') {
+            $qry = $qry->whereDoesntHave('swipeGroups', function ($qry) {
+                $qry->where('swipe_id', '=', $this->id);
+            });
+        } elseif ($params['filter'] === 'status' && $params['filter_status'] !== null) {
+            $qry = $qry->where('status', '=', $params['filter_status']);
+        } elseif ($params['filter'] === 'publish' && $params['filter_publish'] !== null) {
+            $qry = $qry->where('publish', '=', $params['filter_publish']);
+        }
+
+        if ($params['filter_from'] !== null) {
+            $qry = $qry->where('created_at', '>=', $params['filter_from']);
+        }
+
+        if ($params['filter_to'] !== null) {
+            $qry = $qry->where('created_at', '<=', $params['filter_to']);
+        }
+
+        if ($params['search'] !== null) {
+            $qry = $qry->where('title', 'LIKE', "%{$params['search']}%");
+        }
+
+        $qry = $qry->orderBy($params['order_by'], $params['order'])
+            ->offset($params['offset'])
+            ->limit($params['limit']);
+
+        $stories = $qry->get();
+
+        $data_info = [
+            'offset' => $params['offset'],
+            'limit' => $params['limit'],
+            'count' => count($stories),
+            'total' => $qry->count(),
+        ];
+
+        return $stories->map(function ($item) use ($params) {
+            $item = API::story($item, [
+                'thumbnail_width' => 660,
+                'thumbnail_height' => 660,
+            ]);
+            if ($params['is_attached']) {
+                $item->attached = $this->isAttachStory($item->id);
+            }
+            return $item;
+        });
     }
 }

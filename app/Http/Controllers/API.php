@@ -611,7 +611,7 @@ class API extends Controller
         return $swipes;
     }
 
-    public static function story(object $story): object
+    public static function story(object $story, array $params = []): object
     {
         $params['thumbnail_width'] = isset($params['thumbnail_width']) ? intval($params['thumbnail_width']) : 128;
         $params['thumbnail_height'] = isset($params['thumbnail_height']) ? intval($params['thumbnail_height']) : 128;
