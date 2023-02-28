@@ -142,7 +142,7 @@ class Stories extends API
             'token' => ['required', 'string', 'size:60', 'regex:/^[a-zA-Z0-9]+$/', 'exists:tokens,token'],
             'story_id' => ['required', 'string', 'uuid', 'size:36'],
             'title' => ['nullable', 'string', 'min:4', 'max:100'],
-            'media_id' => ['present', 'string', 'nullable'],
+            'media_id' => ['nullable', 'regex:/^[a-z0-9\-\s]+$/i'],
             'status' => ['nullable', 'regex:/^[a-z0-9\s]+$/i', 'in:0,draft,1,active,2,archived,3,deleted'],
             'publish' => ['nullable', new strBoolean],
             'embed' => ['nullable', new StrBoolean],
@@ -155,7 +155,18 @@ class Stories extends API
             return $story;
         }
 
-        if ($params['media_id'] !== null) {
+        $params['media_id'] = isset($params['media_id']) ? $params['media_id'] : false;
+        $params['media_id'] = match (strtolower($params['media_id'])) {
+            'null' => null,
+            'false' => false,
+            default => $params['media_id'],
+        };
+
+        $r->media_id = $params['media_id'];
+
+        if ($params['media_id'] === false) {
+            $params['media_id'] = $story->media_id;
+        } else if ($params['media_id'] !== null) {
             if (!mLiveStreamMedias::where('id', '=', $params['media_id'])->exists()) {
                 $message = (object) [
                     'type' => 'warning',
@@ -179,7 +190,8 @@ class Stories extends API
             '3', 'archived' => API::STORY_STATUS_ARCHIVED,
             default => API::STORY_STATUS_DRAFT,
         }
-            : null;
+        : null;
+
         $params['publish'] = isset($params['publish']) ? filter_var($params['publish'], FILTER_VALIDATE_BOOLEAN) : null;
         $params['embed'] = isset($params['embed']) ? filter_var($params['embed'], FILTER_VALIDATE_BOOLEAN) : null;
         $params['get_story'] = isset($params['get_story']) ? filter_var($params['get_story'], FILTER_VALIDATE_BOOLEAN) : false;
