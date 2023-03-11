@@ -24,9 +24,10 @@ class Account extends API
             'phone_country' => ['required', 'string', 'size:2'],
             'phone_country_dial' => ['nullable', 'string', 'min:2', 'max:5'],
             'phone' => ['required', 'string', 'min:6', 'max:20'],
-            'brand_name' => ['required', 'string', 'min:4', 'max:110'],
+            'brand_name' => ['nullable', 'string', 'min:6', 'max:100'],
             'password' => ['required', 'string', 'min:6', 'max:100'],
             'password_confirmation' => ['nullable', 'string', 'min:6', 'max:100'],
+            'type' => ['nullable', 'integer'],
             'terms' => ['nullable', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
@@ -34,6 +35,7 @@ class Account extends API
 
         $params['name'] = isset($params['name']) ? trim($params['name']) : null;
         $params['email'] = isset($params['email']) ? strtolower(trim($params['email'])) : null;
+        $params['type'] = isset($params['type']) ? trim($params['type']) : null;
         $params['phone_country'] = isset($params['phone_country']) ? trim($params['phone_country']) : null;
         $params['phone_country_dial'] = isset($params['phone_country_dial']) ? trim($params['phone_country_dial']) : null;
         $params['phone'] = isset($params['phone']) ? trim(preg_replace('/[^0-9]/', '', $params['phone'])) : null;
@@ -145,10 +147,12 @@ class Account extends API
 
         try {
             $company_user = new mLiveStreamCompanyUsers;
+           // dd($company_user);
             $company_user->id = $user_id;
             $company_user->role = 1;
             $company_user->company_id = $company_id;
             $company_user->email = $params['email'];
+            $company_user->type =  $params['type'];
             $company_user->name = $params['name'];
             $company_user->password = Hash::make($params['password']);
             $company_user->phone_country = $params['phone_country'];
