@@ -114,6 +114,8 @@ class Account extends API
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
 
+        if($params['type'] == 2){
+
         if (mLiveStreamCompanies::where('name', '=', $params['brand_name'])->exists()) {
             $r->messages[] = (object) [
                 'type' => 'error',
@@ -121,6 +123,8 @@ class Account extends API
             ];
             return response()->json($r, Response::HTTP_BAD_REQUEST);
         }
+
+    }
 
         $company_id = Str::uuid()->toString();
 
