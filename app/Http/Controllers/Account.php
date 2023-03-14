@@ -28,12 +28,14 @@ class Account extends API
             'password' => ['required', 'string', 'min:6', 'max:100'],
             'password_confirmation' => ['nullable', 'string', 'min:6', 'max:100'],
             'type' => ['nullable', 'integer'],
+            'surname' => ['nullable', 'string', 'min:4', 'max:40'],
             'terms' => ['nullable', new strBoolean],
         ], $request->all())) instanceof JsonResponse) {
             return $params;
         }
 
         $params['name'] = isset($params['name']) ? trim($params['name']) : null;
+        $params['surname'] = isset($params['surname']) ? trim($params['surname']) : null;
         $params['email'] = isset($params['email']) ? strtolower(trim($params['email'])) : null;
         $params['type'] = isset($params['type']) ? trim($params['type']) : null;
         $params['phone_country'] = isset($params['phone_country']) ? trim($params['phone_country']) : null;
@@ -158,6 +160,7 @@ class Account extends API
             $company_user->email = $params['email'];
             $company_user->type =  $params['type'];
             $company_user->name = $params['name'];
+            $company_user->surname = $params['surname'];
             $company_user->password = Hash::make($params['password']);
             $company_user->phone_country = $params['phone_country'];
             $company_user->phone_country_dial = $params['phone_country_dial'];
